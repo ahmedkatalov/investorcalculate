@@ -1,16 +1,19 @@
+DROP TABLE IF EXISTS payouts;
+DROP TABLE IF EXISTS investors;
+
 CREATE TABLE investors (
     id SERIAL PRIMARY KEY,
     full_name TEXT NOT NULL,
-    invested_amount NUMERIC(18,2) NOT NULL,
-    share_percent NUMERIC(5,2) NOT NULL, -- доля прибыли, например 5.50 (%)
+    invested_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE payouts (
     id SERIAL PRIMARY KEY,
     investor_id INT NOT NULL REFERENCES investors(id) ON DELETE CASCADE,
-    period_month DATE NOT NULL,                  -- например 2025-01-01 (месяц)
-    company_revenue NUMERIC(18,2) NOT NULL,      -- общая выручка компании
-    payout_amount NUMERIC(18,2) NOT NULL,        -- сколько этому инвестору в этот месяц
+    period_month DATE NOT NULL,
+    payout_amount NUMERIC(18,2) NOT NULL,
+    reinvest BOOLEAN NOT NULL DEFAULT FALSE,
+    is_withdrawal BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

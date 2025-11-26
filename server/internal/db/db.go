@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"invest/internal/config"
 	"log"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -19,15 +20,26 @@ func NewPostgres(cfg *config.Config) *sql.DB {
 		cfg.PostgresDB,
 	)
 
+	log.Printf("Connecting to Postgres: %s@%s:%s/%s\n",
+		cfg.PostgresUser, cfg.PostgresHost, cfg.PostgresPort, cfg.PostgresDB,
+	)
+
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("cannot open db: %v", err)
+		log.Fatalf("❌ Failed to open PostgreSQL connection: %v", err)
 	}
 
+	// Настройки пула подключений (важно для Docker и продакшена)
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxIdleTime(5 * time.Minute)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	// Проверяем реальное соединение
 	if err := db.Ping(); err != nil {
-		log.Fatalf("cannot ping db: %v", err)
+		log.Fatalf("❌ Cannot connect to PostgreSQL: %v", err)
 	}
 
-	log.Println("Connected to Postgres")
+	log.Println("✅ PostgreSQL connected successfully")
 	return db
 }

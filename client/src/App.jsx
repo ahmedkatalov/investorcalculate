@@ -406,6 +406,8 @@ export default function App() {
       setIsSavingPayout(false);
     }
   };
+  const [search, setSearch] = useState("");
+
 
   // подтвердить снятие капитала
   const handleConfirmWithdraw = async () => {
@@ -472,14 +474,31 @@ export default function App() {
   // === РЕНДЕР ===
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 max-sm:p-2">
       <div className="max-w-full mx-auto space-y-6">
         {/* Заголовок / кнопка */}
         <div className="flex items-center justify-between">
+          {/* === ПОИСК КЛИЕНТОВ — добавлено без изменения дизайна === */}
+<div className="w-full">
+  <input
+    type="text"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    placeholder="Поиск по ФИО..."
+    className="
+      max-w-[400px] px-3 py-2
+      rounded-xl bg-slate-800 text-slate-100
+      border border-slate-700
+      focus:ring-2 focus:ring-blue-500
+      outline-none
+    "
+  />
+</div>
+
           <button
             onClick={handleCreateInvestor}
             className="
-              px-3 py-2 text-sm md:px-4 md:py-2 md:text-base
+              px-3 max-sm:text-[10px] py-2 text-sm md:px-4 md:py-2 md:text-base
               border border-slate-300/50 
               rounded-xl text-slate-100 
               hover:bg-slate-700/50 transition
@@ -648,7 +667,11 @@ export default function App() {
 
 
             <tbody>
-              {investors.map((inv, index) => {
+              {investors
+  .filter((inv) =>
+    (inv.fullName || "").toLowerCase().includes(search.toLowerCase())
+  )
+  .map((inv, index) =>{
                 const draft = calcDraftPayout(inv);
                 const capitalNow = getCapitalNow(inv);
                 const currentNet = getCurrentNetProfit(inv);

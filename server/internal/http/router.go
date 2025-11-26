@@ -18,21 +18,26 @@ func NewServer(repo *repository.Repository) *Server {
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
+	// ==========================
 	// Investors
-	mux.HandleFunc("/api/investors", s.handleInvestors)
-	mux.HandleFunc("/api/investors/", s.handleInvestorByID) // ДОБАВЛЕНО - для PUT и DELETE
+	// ==========================
+	mux.HandleFunc("/api/investors", s.handleInvestors)       // GET + POST
+	mux.HandleFunc("/api/investors/", s.handleInvestorByID)   // PUT + DELETE
 
+	// ==========================
 	// Payouts
-	mux.HandleFunc("/api/payouts", s.handlePayouts)                 // GET + POST вместе
-	mux.HandleFunc("/api/payouts/calculate", s.handleCalculatePayouts)
+	// ==========================
+	mux.HandleFunc("/api/payouts", s.handlePayouts)           // GET + POST
 
-	// Настройка CORS
+	// ==========================
+	// CORS
+	// ==========================
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"*"}, // В продакшене замените на ваш домен
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"*"},
+		AllowedOrigins:   []string{"*"}, 
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
 
-	return c.Handler(mux) // ← ИСПРАВЬТЕ ЭТУ СТРОКУ!
+	return c.Handler(mux)
 }
