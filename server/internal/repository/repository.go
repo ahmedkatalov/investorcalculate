@@ -1,95 +1,117 @@
 package repository
 
 import (
-	"context"
-	"database/sql"
-	"invest/internal/models"
-	
+    "context"
+    "database/sql"
+    "invest/internal/models"
 )
 
 type Repository struct {
-	db *sql.DB
+    db *sql.DB
 }
 
 func New(db *sql.DB) *Repository {
-	return &Repository{db: db}
+    return &Repository{db: db}
 }
 
 //
 // ================== INVESTORS ==================
 //
 
+// список всех инвесторов
 func (r *Repository) ListInvestors(ctx context.Context) ([]models.Investor, error) {
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, full_name, invested_amount, created_at 
-		 FROM investors ORDER BY id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+    rows, err := r.db.QueryContext(ctx,
+        `SELECT id, full_name, invested_amount, created_at 
+         FROM investors ORDER BY id`)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
 
-	var list []models.Investor
-	for rows.Next() {
-		var inv models.Investor
-		if err := rows.Scan(&inv.ID, &inv.FullName, &inv.InvestedAmount, &inv.CreatedAt); err != nil {
-			return nil, err
-		}
-		list = append(list, inv)
-	}
-	return list, nil
+    var list []models.Investor
+    for rows.Next() {
+        var inv models.Investor
+        if err := rows.Scan(
+            &inv.ID,
+            &inv.FullName,
+            &inv.InvestedAmount,
+            &inv.CreatedAt,
+        ); err != nil {
+            return nil, err
+        }
+        list = append(list, inv)
+    }
+
+    return list, nil
 }
 
+// создание инвестора
 func (r *Repository) CreateInvestor(ctx context.Context, inv *models.Investor) error {
-	return r.db.QueryRowContext(ctx,
-		`INSERT INTO investors (full_name, invested_amount)
-		 VALUES ($1, $2)
-		 RETURNING id, created_at`,
-		inv.FullName, inv.InvestedAmount,
-	).Scan(&inv.ID, &inv.CreatedAt)
+    return r.db.QueryRowContext(ctx,
+        `INSERT INTO investors (full_name, invested_amount)
+         VALUES ($1, $2)
+         RETURNING id, full_name, invested_amount, created_at`,
+        inv.FullName,
+        inv.InvestedAmount,
+    ).Scan(
+        &inv.ID,
+        &inv.FullName,
+        &inv.InvestedAmount,
+        &inv.CreatedAt,
+    )
 }
 
 func (r *Repository) UpdateInvestor(ctx context.Context, id int64, fullName *string, investedAmount *float64) error {
-	if fullName != nil {
-		_, err := r.db.ExecContext(ctx,
-			`UPDATE investors SET full_name=$1 WHERE id=$2`,
-			*fullName, id,
-		)
-		if err != nil {
-			return err
-		}
-	}
+    if fullName != nil {
+        _, err := r.db.ExecContext(ctx,
+            `UPDATE investors SET full_name=$1 WHERE id=$2`,
+            *fullName, id,
+        )
+        if err != nil {
+            return err
+        }
+    }
 
-	if investedAmount != nil {
-		_, err := r.db.ExecContext(ctx,
-			`UPDATE investors SET invested_amount=$1 WHERE id=$2`,
-			*investedAmount, id,
-		)
-		if err != nil {
-			return err
-		}
-	}
+    if investedAmount != nil {
+        _, err := r.db.ExecContext(ctx,
+            `UPDATE investors SET invested_amount=$1 WHERE id=$2`,
+            *investedAmount, id,
+        )
+        if err != nil {
+            return err
+        }
+    }
 
-	return nil
+    return nil
 }
 
 func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM investors WHERE id=$1`, id)
-	return err
+    _, err := r.db.ExecContext(ctx,
+        `DELETE FROM investors WHERE id=$1`,
+        id,
+    )
+    return err
 }
 
 func (r *Repository) GetInvestorByID(ctx context.Context, id int64) (*models.Investor, error) {
-	var inv models.Investor
-	err := r.db.QueryRowContext(ctx,
-		`SELECT id, full_name, invested_amount, created_at 
-		 FROM investors WHERE id=$1`,
-		id,
-	).Scan(&inv.ID, &inv.FullName, &inv.InvestedAmount, &inv.CreatedAt)
+    var inv models.Investor
 
-	if err != nil {
-		return nil, err
-	}
+    err := r.db.QueryRowContext(ctx,
+        `SELECT id, full_name, invested_amount, created_at 
+         FROM investors WHERE id=$1`,
+        id,
+    ).Scan(
+        &inv.ID,
+        &inv.FullName,
+        &inv.InvestedAmount,
+        &inv.CreatedAt,
+    )
 
-	return &inv, nil
+    if err != nil {
+        return nil, err
+    }
+
+    return &inv, nil
 }
 
 //
@@ -97,55 +119,53 @@ func (r *Repository) GetInvestorByID(ctx context.Context, id int64) (*models.Inv
 //
 
 func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
-	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, investor_id, period_month, payout_amount, reinvest, is_withdrawal, created_at
-		 FROM payouts
-		 ORDER BY period_month, id`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+    rows, err := r.db.QueryContext(ctx,
+        `SELECT id, investor_id, period_month, payout_amount, reinvest, is_withdrawal, created_at
+         FROM payouts
+         ORDER BY period_month, id`)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
 
-	var out []models.Payout
-	for rows.Next() {
-		var p models.Payout
-		if err := rows.Scan(
-			&p.ID,
-			&p.InvestorID,
-			&p.PeriodMonth,
-			&p.PayoutAmount,
-			&p.Reinvest,
-			&p.IsWithdrawal,
-			&p.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		out = append(out, p)
-	}
+    var list []models.Payout
+    for rows.Next() {
+        var p models.Payout
+        if err := rows.Scan(
+            &p.ID,
+            &p.InvestorID,
+            &p.PeriodMonth,
+            &p.PayoutAmount,
+            &p.Reinvest,
+            &p.IsWithdrawal,
+            &p.CreatedAt,
+        ); err != nil {
+            return nil, err
+        }
+        list = append(list, p)
+    }
 
-	return out, nil
+    return list, nil
 }
 
+// создать одну выплату
 func (r *Repository) CreatePayout(ctx context.Context, p *models.Payout) error {
-	return r.db.QueryRowContext(ctx,
-		`INSERT INTO payouts (investor_id, period_month, payout_amount, reinvest, is_withdrawal)
+    return r.db.QueryRowContext(ctx,
+        `INSERT INTO payouts (investor_id, period_month, payout_amount, reinvest, is_withdrawal)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, created_at`,
-		p.InvestorID,
-		p.PeriodMonth,
-		p.PayoutAmount,
-		p.Reinvest,
-		p.IsWithdrawal,
-	).Scan(&p.ID, &p.CreatedAt)
+         RETURNING id, investor_id, period_month, payout_amount, reinvest, is_withdrawal, created_at`,
+        p.InvestorID,
+        p.PeriodMonth,
+        p.PayoutAmount,
+        p.Reinvest,
+        p.IsWithdrawal,
+    ).Scan(
+        &p.ID,
+        &p.InvestorID,
+        &p.PeriodMonth,
+        &p.PayoutAmount,
+        &p.Reinvest,
+        &p.IsWithdrawal,
+        &p.CreatedAt,
+    )
 }
-
-//
-//  НЕ НУЖНО БОЛЬШЕ:
-//  - CreatePayoutsForMonth
-//  - share_percent
-//  - company_revenue
-//  - calc by revenue
-//
-//  ТВОЙ ФРОНТ ЭТО НЕ ИСПОЛЬЗУЕТ!
-//
-//
