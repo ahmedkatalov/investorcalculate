@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    container_name: invest_postgres
+    environment:
+      POSTGRES_USER: invest
+      POSTGRES_PASSWORD: investpass
+      POSTGRES_DB: investdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/docker-entrypoint-initdb.d
+
+  backend:
+    build: ./server
+    restart: unless-stopped
+    container_name: invest_backend
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_USER: invest
+      POSTGRES_PASSWORD: investpass
+      POSTGRES_DB: investdb
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      API_PORT: 8080
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./client
+    restart: unless-stopped
+    container_name: invest_frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:

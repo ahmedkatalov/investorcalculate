@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* Горизонтальный и вертикальный скролл — минимальная толщина */
+::-webkit-scrollbar {
+  width: 6px;       /* вертикальный */
+  height: 6px;      /* горизонтальный */
+}
+
+/* Ползунок (ползящая часть) */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);  /* светло-серый */
+  border-radius: 8px;
+}
+
+/* При наведении мыши */
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Полоса фона */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
