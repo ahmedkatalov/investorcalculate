@@ -8,7 +8,17 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 export async function fetchInvestors() {
   const res = await fetch(`${API_URL}/api/investors`);
   if (!res.ok) return [];
-  return res.json();
+
+  const data = await res.json();
+
+  // Приводим к корректным именам, которые использует фронт
+  return data.map((i) => ({
+    id: i.id,
+    fullName: i.full_name ?? i.fullName ?? "",
+    investedAmount: Number(i.invested_amount ?? i.investedAmount ?? 0),
+    sharePercent: Number(i.share_percent ?? i.sharePercent ?? 0),
+    createdAt: i.created_at,
+  }));
 }
 
 // Создать инвестора
@@ -17,12 +27,22 @@ export async function createInvestor(fullName, investedAmount) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fullName,
-      investedAmount,
+      fullName,        // backend ждёт fullName
+      investedAmount,  // backend ждёт investedAmount
+      sharePercent: 0, // обязательно!
     }),
   });
 
-  return res.json();
+  const i = await res.json();
+
+  // Нормализуем
+  return {
+    id: i.id,
+    fullName: i.full_name ?? i.fullName ?? "",
+    investedAmount: Number(i.invested_amount ?? i.investedAmount ?? 0),
+    sharePercent: Number(i.share_percent ?? i.sharePercent ?? 0),
+    createdAt: i.created_at,
+  };
 }
 
 // ===========================
@@ -33,7 +53,15 @@ export async function createInvestor(fullName, investedAmount) {
 export async function fetchPayouts() {
   const res = await fetch(`${API_URL}/api/payouts`);
   if (!res.ok) return [];
-  return res.json();
+  const data = await res.json();
+
+  return data.map((p) => ({
+    id: p.id,
+    investorId: p.investor_id ?? p.investorId,
+    periodMonth: p.period_month ?? p.periodMonth,
+    payoutAmount: Number(p.payout_amount ?? p.payoutAmount ?? 0),
+    companyRevenue: Number(p.company_revenue ?? p.companyRevenue ?? 0),
+  }));
 }
 
 // Создать одну выплату
@@ -48,11 +76,19 @@ export async function createPayout(investorId, periodMonth, percent) {
     }),
   });
 
-  return res.json();
+  const p = await res.json();
+
+  return {
+    id: p.id,
+    investorId: p.investor_id ?? p.investorId,
+    periodMonth: p.period_month ?? p.periodMonth,
+    payoutAmount: Number(p.payout_amount ?? p.payoutAmount ?? 0),
+    companyRevenue: Number(p.company_revenue ?? p.companyRevenue ?? 0),
+  };
 }
 
 // ===========================
-// Сохранить выручку месяца (правильный endpoint)
+// Сохранить выручку месяца
 // ===========================
 
 export async function saveCompanyRevenue(periodMonth, amount) {
