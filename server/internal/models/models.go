@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+
 type Investor struct {
     ID             int64     `json:"id"`
     FullName       string    `json:"fullName"`

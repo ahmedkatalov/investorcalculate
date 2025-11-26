@@ -1,8 +1,10 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
+//
 // ===========================
-// Инвесторы
+//   ИНВЕСТОРЫ
 // ===========================
+//
 
 // Получить всех инвесторов
 export async function fetchInvestors() {
@@ -11,12 +13,10 @@ export async function fetchInvestors() {
 
   const data = await res.json();
 
-  // Приводим к корректным именам, которые использует фронт
   return data.map((i) => ({
     id: i.id,
-    fullName: i.full_name ?? i.fullName ?? "",
-    investedAmount: Number(i.invested_amount ?? i.investedAmount ?? 0),
-    sharePercent: Number(i.share_percent ?? i.sharePercent ?? 0),
+    fullName: i.full_name,
+    investedAmount: Number(i.invested_amount),
     createdAt: i.created_at,
   }));
 }
@@ -27,79 +27,81 @@ export async function createInvestor(fullName, investedAmount) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fullName,        // backend ждёт fullName
-      investedAmount,  // backend ждёт investedAmount
-      sharePercent: 0, // обязательно!
+      fullName,
+      investedAmount
     }),
   });
 
+  if (!res.ok) throw new Error("Failed to create investor");
   const i = await res.json();
 
-  // Нормализуем
   return {
     id: i.id,
-    fullName: i.full_name ?? i.fullName ?? "",
-    investedAmount: Number(i.invested_amount ?? i.investedAmount ?? 0),
-    sharePercent: Number(i.share_percent ?? i.sharePercent ?? 0),
+    fullName: i.full_name,
+    investedAmount: Number(i.invested_amount),
     createdAt: i.created_at,
   };
 }
 
+//
 // ===========================
-// Выплаты
+//   ВЫПЛАТЫ
 // ===========================
+//
 
 // Получить все выплаты
 export async function fetchPayouts() {
   const res = await fetch(`${API_URL}/api/payouts`);
   if (!res.ok) return [];
+
   const data = await res.json();
 
   return data.map((p) => ({
     id: p.id,
-    investorId: p.investor_id ?? p.investorId,
-    periodMonth: p.period_month ?? p.periodMonth,
-    payoutAmount: Number(p.payout_amount ?? p.payoutAmount ?? 0),
-    companyRevenue: Number(p.company_revenue ?? p.companyRevenue ?? 0),
+    investorId: p.investor_id,
+    periodMonth: p.period_month,
+    payoutAmount: Number(p.payout_amount),
+    reinvest: p.reinvest,
+    isWithdrawal: p.is_withdrawal,
+    createdAt: p.created_at
   }));
 }
 
-// Создать одну выплату
-export async function createPayout(investorId, periodMonth, percent) {
+// Создать выплату
+export async function createPayout(investorId, periodMonth, payoutAmount, reinvest) {
   const res = await fetch(`${API_URL}/api/payouts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       investorId,
       periodMonth,
-      percent,
+      payoutAmount,
+      reinvest,
+      isWithdrawal: false
     }),
   });
 
+  if (!res.ok) throw new Error("Failed to create payout");
   const p = await res.json();
 
   return {
     id: p.id,
-    investorId: p.investor_id ?? p.investorId,
-    periodMonth: p.period_month ?? p.periodMonth,
-    payoutAmount: Number(p.payout_amount ?? p.payoutAmount ?? 0),
-    companyRevenue: Number(p.company_revenue ?? p.companyRevenue ?? 0),
+    investorId: p.investor_id,
+    periodMonth: p.period_month,
+    payoutAmount: Number(p.payout_amount),
+    reinvest: p.reinvest,
+    isWithdrawal: p.is_withdrawal,
+    createdAt: p.created_at
   };
 }
 
+//
 // ===========================
-// Сохранить выручку месяца
+//   Удаляем весь старый функционал
 // ===========================
-
-export async function saveCompanyRevenue(periodMonth, amount) {
-  const res = await fetch(`${API_URL}/api/payouts/calculate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      period_month: periodMonth,
-      company_revenue: amount,
-    }),
-  });
-
-  return res.json();
-}
+//
+// ❌ НЕТ sharePercent
+// ❌ НЕТ companyRevenue
+// ❌ НЕТ /api/payouts/calculate
+// ❌ НЕТ draft/percent на backend
+//
