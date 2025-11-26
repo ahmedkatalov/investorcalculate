@@ -65,7 +65,18 @@ export default function App() {
   // загрузка инвесторов и выплат
   useEffect(() => {
     fetchInvestors().then((data) => {
-      setInvestors(Array.isArray(data) ? data : []);
+     setInvestors(
+  Array.isArray(data)
+    ? data.map((i) => ({
+        ...i,
+        id: i.id ?? i.ID ?? i.investorId ?? i.investor_id,   // ← добавлено
+        fullName: i.fullName ?? i.full_name ?? "",
+        investedAmount: Number(i.investedAmount ?? i.invested_amount ?? 0),
+        sharePercent: Number(i.sharePercent ?? i.share_percent ?? 0),
+      }))
+    : []
+);
+
     });
 
     fetchPayouts().then((data) => {
@@ -212,14 +223,28 @@ export default function App() {
     updateInvestor(id, { [field]: value });
   };
 
-  const handleCreateInvestor = async () => {
-    try {
-      const inv = await createInvestor("Введите ФИО", 0);
-      setInvestors((p) => [...p, inv]);
-    } catch {
-      // молча
+const handleCreateInvestor = async () => {
+  try {
+    const res = await createInvestor("Введите ФИО", 0);
+
+    if (!res || !res.id) {
+      console.error("❌ Backend did not return id:", res);
+      return;
     }
-  };
+
+    setInvestors((prev) => [
+      ...prev,
+      {
+        ...res,
+        investedAmount: res.investedAmount ?? 0,
+        fullName: res.fullName ?? "",
+      },
+    ]);
+  } catch (err) {
+    console.error("Create investor error:", err);
+  }
+};
+
 
   const handleConfirmDelete = async () => {
     if (!deletePopup.investor) return;
