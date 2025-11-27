@@ -13,7 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/migrations:/docker-entrypoint-initdb.d
+      - ./server/db/migrations:/docker-entrypoint-initdb.d     # ← ИСПРАВЛЕНО!
 
   backend:
     build: ./server
@@ -30,12 +30,10 @@ services:
       API_PORT: "8080"
       CORS_ORIGIN: "http://localhost:5173"
 
-      SECRET_REG_CODE: "BM887700"
-      JWT_SECRET: "jwt_secret_key_123"
+      SECRET_REG_CODE: "BM887700"        # ← Работает
+      JWT_SECRET: "jwt_secret_key_123"   # ← Работает
     ports:
       - "8080:8080"
-
-
 
   frontend:
     build: ./client

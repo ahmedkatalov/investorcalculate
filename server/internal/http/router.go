@@ -38,8 +38,10 @@ func (s *Server) Routes() http.Handler {
 	// ==========================
 	mux.HandleFunc("/api/payouts", s.handlePayouts)    
 		// Auth
-	mux.HandleFunc("/api/register", s.handleRegister)
+
 	mux.HandleFunc("/api/login", s.handleLogin)
+	mux.HandleFunc("/api/register", s.handleRegister)
+
        // GET + POST
 
 	// ==========================
