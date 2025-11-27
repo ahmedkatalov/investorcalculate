@@ -53,7 +53,7 @@ export async function fetchPayouts() {
   return data.map(p => ({
     id: p.id,
     investorId: p.investor_id,
-    periodMonth: p.period_month,
+    periodMonth: p.period_month.slice(0, 7), // <-- YYYY-MM
     payoutAmount: Number(p.payout_amount),
     reinvest: p.reinvest,
     isWithdrawal: p.is_withdrawal,
@@ -67,7 +67,7 @@ export async function createPayout(investorId, periodMonth, payoutAmount, reinve
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       investorId,
-      periodMonth,
+      periodMonth,    // <-- "2025-02"
       payoutAmount,
       reinvest,
       isWithdrawal: false
@@ -81,7 +81,39 @@ export async function createPayout(investorId, periodMonth, payoutAmount, reinve
   return {
     id: p.id,
     investorId: p.investor_id,
-    periodMonth: p.period_month,
+    periodMonth: p.period_month.slice(0, 7), // <-- нормализуем
+    payoutAmount: Number(p.payout_amount),
+    reinvest: p.reinvest,
+    isWithdrawal: p.is_withdrawal,
+    createdAt: p.created_at
+  };
+}
+
+//
+// WITHDRAW
+//
+
+export async function createWithdraw(investorId, periodMonth, amount) {
+  const res = await fetch(`${API_URL}/api/payouts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      investorId,
+      periodMonth,
+      payoutAmount: -Math.abs(amount),
+      reinvest: false,
+      isWithdrawal: true
+    }),
+  });
+
+  if (!res.ok) throw new Error("Failed to create withdrawal");
+
+  const p = await res.json();
+
+  return {
+    id: p.id,
+    investorId: p.investor_id,
+    periodMonth: p.period_month.slice(0, 7),
     payoutAmount: Number(p.payout_amount),
     reinvest: p.reinvest,
     isWithdrawal: p.is_withdrawal,
