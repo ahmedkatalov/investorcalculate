@@ -139,21 +139,48 @@ export default function App() {
   };
 
   // проценты
-  const handlePercentChange = (id, rawValue) => {
-    const cleaned = rawValue.replace(/[^0-9.,]/g, "").replace(",", ".");
-    if (cleaned === "") {
-      setPercents((prev) => {
-        const c = { ...prev };
-        delete c[id];
-        return c;
-      });
-      return;
-    }
-    const n = Number(cleaned);
-    if (!Number.isNaN(n)) {
-      setPercents((p) => ({ ...p, [id]: n }));
-    }
-  };
+const handlePercentChange = (id, rawValue) => {
+  // оставляем только цифры, точки и запятые
+  let v = rawValue.replace(/[^0-9.,]/g, "");
+
+  // все запятые -> точки
+  v = v.replace(/,/g, ".");
+
+  // оставляем только одну точку (первую), остальные выкидываем
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    v =
+      v.slice(0, firstDot + 1) +
+      v
+        .slice(firstDot + 1)
+        .replace(/\./g, "");
+  }
+
+  // если поле очистили – удаляем процент
+  if (v === "") {
+    setPercents((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    return;
+  }
+
+  // на onChange НИЧЕГО не парсим в Number, просто храним строку
+  setPercents((prev) => ({ ...prev, [id]: v }));
+};
+
+const handlePercentBlur = (id) => {
+  const v = percents[id];
+  if (!v && v !== 0) return;
+
+  const num = Number(String(v).replace(/,/g, "."));
+  if (!Number.isNaN(num)) {
+    // на blur приводим к числу
+    setPercents((prev) => ({ ...prev, [id]: num }));
+  }
+};
+
 
   // обновление инвестора
   const updateInvestor = async (id, updates) => {
@@ -802,18 +829,18 @@ const handleConfirmWithdraw = async () => {
                     </td>
 
                     {/* % */}
-                    <td className="py-2 px-4 border-r border-slate-700/50 text-center min-w-[90px]">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={percents[inv.id] ?? ""}
-                        onChange={(e) =>
-                          handlePercentChange(inv.id, e.target.value)
-                        }
-                        className="w-full text-center bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-emerald-400"
-                        placeholder="0"
-                      />
-                    </td>
+<td className="py-2 px-4 border-r border-slate-700/50 text-center min-w-[90px]">
+  <input
+    type="text"
+    inputMode="decimal"
+    value={percents[inv.id] ?? ""}
+    onChange={(e) => handlePercentChange(inv.id, e.target.value)}
+    onBlur={() => handlePercentBlur(inv.id)}
+    className="w-full text-center bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-emerald-400"
+    placeholder="0"
+  />
+</td>
+
 
                     {/* Выплата (черновик) */}
                     <td className="py-2 px-4 border-r border-slate-700/50 min-w-[130px] font-semibold text-emerald-400">
