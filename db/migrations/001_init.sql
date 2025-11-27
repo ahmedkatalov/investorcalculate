@@ -26,7 +26,7 @@ ADD COLUMN is_withdrawal_capital BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- старый is_withdrawal можешь оставить или удалить позже
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
