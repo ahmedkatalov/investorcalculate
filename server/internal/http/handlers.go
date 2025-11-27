@@ -20,7 +20,9 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 }
 
 //
-// Investors
+// ========================
+//      INVESTORS
+// ========================
 //
 
 func (s *Server) handleInvestors(w http.ResponseWriter, r *http.Request) {
@@ -37,16 +39,19 @@ func (s *Server) handleInvestors(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, 200, list)
 
     case http.MethodPost:
+        // 🔥 Создаём инвестора даже если фронт прислал пустые поля
         var inv models.Investor
 
-        if err := json.NewDecoder(r.Body).Decode(&inv); err != nil {
-            writeJSON(w, 400, errorResponse{Error: "invalid json"})
-            return
+        _ = json.NewDecoder(r.Body).Decode(&inv)
+
+        // Если имя пустое — оставляем пустым. Это НОРМАЛЬНО.
+        if inv.FullName == "" {
+            inv.FullName = ""
         }
 
-        if inv.FullName == "" {
-            writeJSON(w, 400, errorResponse{Error: "full_name required"})
-            return
+        // Если сумма пустая — ставим 0.
+        if inv.InvestedAmount == 0 {
+            inv.InvestedAmount = 0
         }
 
         if err := s.repo.CreateInvestor(ctx, &inv); err != nil {
@@ -111,10 +116,10 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 }
 
 //
-// Payouts
+// ========================
+//      PAYOUTS
+// ========================
 //
-
-// Payouts
 
 func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
@@ -130,7 +135,6 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, 200, list)
 
     case http.MethodPost:
-        // получаем payload из фронта
         var req struct {
             InvestorID          int64   `json:"investorId"`
             PeriodMonth         string  `json:"periodMonth"`
