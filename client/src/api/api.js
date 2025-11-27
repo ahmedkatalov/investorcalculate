@@ -1,62 +1,56 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 //
-// ===========================
-//   ИНВЕСТОРЫ
-// ===========================
+// INVESTORS
 //
 
-// Получить всех инвесторов
 export async function fetchInvestors() {
   const res = await fetch(`${API_URL}/api/investors`);
   if (!res.ok) return [];
 
   const data = await res.json();
 
-  return data.map((i) => ({
+  return data.map(i => ({
     id: i.id,
     fullName: i.full_name,
     investedAmount: Number(i.invested_amount),
-    createdAt: i.created_at,
+    createdAt: i.created_at
   }));
 }
 
-// Создать инвестора
 export async function createInvestor(fullName, investedAmount) {
   const res = await fetch(`${API_URL}/api/investors`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      fullName,
-      investedAmount
+      full_name: fullName,
+      invested_amount: investedAmount
     }),
   });
 
   if (!res.ok) throw new Error("Failed to create investor");
+
   const i = await res.json();
 
   return {
     id: i.id,
     fullName: i.full_name,
     investedAmount: Number(i.invested_amount),
-    createdAt: i.created_at,
+    createdAt: i.created_at
   };
 }
 
 //
-// ===========================
-//   ВЫПЛАТЫ
-// ===========================
+// PAYOUTS
 //
 
-// Получить все выплаты
 export async function fetchPayouts() {
   const res = await fetch(`${API_URL}/api/payouts`);
   if (!res.ok) return [];
 
   const data = await res.json();
 
-  return data.map((p) => ({
+  return data.map(p => ({
     id: p.id,
     investorId: p.investor_id,
     periodMonth: p.period_month,
@@ -67,7 +61,6 @@ export async function fetchPayouts() {
   }));
 }
 
-// Создать выплату
 export async function createPayout(investorId, periodMonth, payoutAmount, reinvest) {
   const res = await fetch(`${API_URL}/api/payouts`, {
     method: "POST",
@@ -82,6 +75,7 @@ export async function createPayout(investorId, periodMonth, payoutAmount, reinve
   });
 
   if (!res.ok) throw new Error("Failed to create payout");
+
   const p = await res.json();
 
   return {
@@ -94,14 +88,3 @@ export async function createPayout(investorId, periodMonth, payoutAmount, reinve
     createdAt: p.created_at
   };
 }
-
-//
-// ===========================
-//   Удаляем весь старый функционал
-// ===========================
-//
-// ❌ НЕТ sharePercent
-// ❌ НЕТ companyRevenue
-// ❌ НЕТ /api/payouts/calculate
-// ❌ НЕТ draft/percent на backend
-//
