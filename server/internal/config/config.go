@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+
+
 type Config struct {
 	PostgresUser     string
 	PostgresPassword string
@@ -14,7 +16,11 @@ type Config struct {
 	PostgresPort     string
 	APIPort          string
 	CORSOrigins      []string
+
+	JWTSecret      string
+	SecretRegCode  string
 }
+
 
 func Load() *Config {
 	cfg := &Config{
@@ -24,6 +30,11 @@ func Load() *Config {
 		PostgresHost:     getEnv("POSTGRES_HOST", "localhost"),
 		PostgresPort:     getEnv("POSTGRES_PORT", "5432"),
 		APIPort:          getEnv("API_PORT", "8080"),
+
+
+		JWTSecret:     getEnv("JWT_SECRET", "change_me_jwt_secret"),
+		SecretRegCode: getEnv("SECRET_REG_CODE", "change_me_reg_code"),
+
 	}
 
 	// CORS может содержать несколько доменов через запятую

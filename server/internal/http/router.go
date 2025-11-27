@@ -1,6 +1,7 @@
 package http
 
 import (
+	"invest/internal/config"
 	"invest/internal/repository"
 	"net/http"
 
@@ -8,12 +9,20 @@ import (
 )
 
 type Server struct {
-	repo *repository.Repository
+	repo          *repository.Repository
+	jwtSecret     []byte
+	secretRegCode string
 }
 
-func NewServer(repo *repository.Repository) *Server {
-	return &Server{repo: repo}
+
+func NewServer(repo *repository.Repository, cfg *config.Config) *Server {
+	return &Server{
+		repo:          repo,
+		jwtSecret:     []byte(cfg.JWTSecret),
+		secretRegCode: cfg.SecretRegCode,
+	}
 }
+
 
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
@@ -27,7 +36,11 @@ func (s *Server) Routes() http.Handler {
 	// ==========================
 	// Payouts
 	// ==========================
-	mux.HandleFunc("/api/payouts", s.handlePayouts)           // GET + POST
+	mux.HandleFunc("/api/payouts", s.handlePayouts)    
+		// Auth
+	mux.HandleFunc("/api/register", s.handleRegister)
+	mux.HandleFunc("/api/login", s.handleLogin)
+       // GET + POST
 
 	// ==========================
 	// CORS

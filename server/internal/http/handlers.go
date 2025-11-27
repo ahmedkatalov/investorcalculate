@@ -114,6 +114,8 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 // Payouts
 //
 
+// Payouts
+
 func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
 
@@ -128,12 +130,14 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, 200, list)
 
     case http.MethodPost:
+        // получаем payload из фронта
         var req struct {
-            InvestorID   int64   `json:"investorId"`
-            PeriodMonth  string  `json:"periodMonth"`
-            PayoutAmount float64 `json:"payoutAmount"`
-            Reinvest     bool    `json:"reinvest"`
-            IsWithdrawal bool    `json:"isWithdrawal"`
+            InvestorID          int64   `json:"investorId"`
+            PeriodMonth         string  `json:"periodMonth"`
+            PayoutAmount        float64 `json:"payoutAmount"`
+            Reinvest            bool    `json:"reinvest"`
+            IsWithdrawalProfit  bool    `json:"isWithdrawalProfit"`
+            IsWithdrawalCapital bool    `json:"isWithdrawalCapital"`
         }
 
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -148,11 +152,12 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
         }
 
         p := models.Payout{
-            InvestorID:   req.InvestorID,
-            PeriodMonth:  period,
-            PayoutAmount: req.PayoutAmount,
-            Reinvest:     req.Reinvest,
-            IsWithdrawal: req.IsWithdrawal,
+            InvestorID:          req.InvestorID,
+            PeriodMonth:         period,
+            PayoutAmount:        req.PayoutAmount,
+            Reinvest:            req.Reinvest,
+            IsWithdrawalProfit:  req.IsWithdrawalProfit,
+            IsWithdrawalCapital: req.IsWithdrawalCapital,
         }
 
         if err := s.repo.CreatePayout(ctx, &p); err != nil {

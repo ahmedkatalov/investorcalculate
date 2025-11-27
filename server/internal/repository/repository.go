@@ -96,7 +96,8 @@ func (r *Repository) GetInvestorByID(ctx context.Context, id int64) (*models.Inv
 
 func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
     rows, err := r.db.QueryContext(ctx,
-        `SELECT id, investor_id, period_month, payout_amount, reinvest, is_withdrawal, created_at
+        `SELECT id, investor_id, period_month, payout_amount, reinvest,
+                is_withdrawal_profit, is_withdrawal_capital, created_at
          FROM payouts ORDER BY period_month, id`)
     if err != nil {
         return nil, err
@@ -112,11 +113,13 @@ func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
             &p.PeriodMonth,
             &p.PayoutAmount,
             &p.Reinvest,
-            &p.IsWithdrawal,
+            &p.IsWithdrawalProfit,
+            &p.IsWithdrawalCapital,
             &p.CreatedAt,
         ); err != nil {
             return nil, err
         }
+
         out = append(out, p)
     }
     return out, nil
@@ -124,13 +127,16 @@ func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
 
 func (r *Repository) CreatePayout(ctx context.Context, p *models.Payout) error {
     return r.db.QueryRowContext(ctx,
-        `INSERT INTO payouts (investor_id, period_month, payout_amount, reinvest, is_withdrawal)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO payouts 
+            (investor_id, period_month, payout_amount, reinvest,
+             is_withdrawal_profit, is_withdrawal_capital)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, created_at`,
         p.InvestorID,
         p.PeriodMonth,
         p.PayoutAmount,
         p.Reinvest,
-        p.IsWithdrawal,
+        p.IsWithdrawalProfit,
+        p.IsWithdrawalCapital,
     ).Scan(&p.ID, &p.CreatedAt)
 }

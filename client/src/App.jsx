@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import {
   fetchInvestors,
   fetchPayouts,
-  createPayout,
+  createReinvest,
+  createTakeProfit,
+  createCapitalWithdraw,
   createInvestor,
 } from "./api/api";
 
+
 // форматирование денег в поле ввода с пробелами
 const formatMoneyInput = (value) => {
+
   const numeric = String(value ?? "").replace(/\s/g, "");
   if (!/^\d*$/.test(numeric)) return value;
   return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -20,6 +24,8 @@ const fmt = (v) =>
 const MAX_VISIBLE_MONTH_SLOTS = 4;
 
 export default function App() {
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const [investors, setInvestors] = useState([]);
   const [payouts, setPayouts] = useState([]);
   const [percents, setPercents] = useState({});
@@ -188,7 +194,7 @@ export default function App() {
   // создать инвестора
   const handleCreateInvestor = async () => {
     try {
-      const res = await createInvestor("Введите ФИО", 0);
+      const res = await createInvestor("", 0);
 
       if (!res || !res.id) {
         console.error("❌ backend error:", res);
@@ -212,17 +218,27 @@ export default function App() {
     } catch {}
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deletePopup.investor) return;
-    const id = deletePopup.investor.id;
+const handleConfirmDelete = async () => {
+  if (!deletePopup.investor) return;
 
+  setIsDeleting(true);
+
+  const id = deletePopup.investor.id;
+
+  try {
     await deleteInvestorApi(id);
 
     setInvestors((prev) => prev.filter((i) => i.id !== id));
     setPayouts((prev) => prev.filter((p) => p.investorId !== id));
 
     setDeletePopup({ show: false, investor: null });
-  };
+  } catch (err) {
+    console.error("Ошибка удаления:", err);
+  } finally {
+    setIsDeleting(false);
+  }
+};
+
   // === МНОЖЕСТВЕННЫЕ КОЛОНКИ ПО МЕСЯЦАМ ===
   const { monthSlots, payoutsByMonthInv } = useMemo(() => {
     const byMonthInv = new Map();
@@ -333,114 +349,95 @@ export default function App() {
 
   // === СОХРАНЕНИЕ ВЫПЛАТЫ (3 типа операций) ===
 
-  const handleConfirmPayout = async () => {
-    const inv = payoutModal.investor;
-    if (!inv) return;
+const handleConfirmPayout = async () => {
+  const inv = payoutModal.investor;
+  if (!inv) return;
 
-    const percent = percents[inv.id];
-    if (percent === undefined || percent === null || percent === "") {
-      closePayoutModal();
-      return;
+  const percent = percents[inv.id];
+  if (percent === undefined || percent === null || percent === "") {
+    closePayoutModal();
+    return;
+  }
+
+  const monthKey = payoutModal.monthKey || currentMonthKey;
+
+  const capitalBefore = getCapitalNow(inv);
+  const payoutAmount = Math.round((capitalBefore * Number(percent)) / 100);
+
+  setIsSavingPayout(true);
+
+  try {
+    if (payoutModal.reinvest) {
+      // 🔵 Реинвест
+      await createReinvest(inv.id, monthKey, payoutAmount);
+    } else {
+      // 🟡 Забрал прибыль
+      await createTakeProfit(inv.id, monthKey, payoutAmount);
     }
 
-    const monthKey = payoutModal.monthKey || currentMonthKey;
+    const fresh = await fetchPayouts();
+    setPayouts(
+      fresh.map((p) => ({
+        ...p,
+        isWithdrawalProfit: !!p.isWithdrawalProfit,
+        isWithdrawalCapital: !!p.isWithdrawalCapital,
+      }))
+    );
 
-    // Считаем сумму
-    const capitalBefore = getCapitalNow(inv);
-    const payoutAmount = Math.round((capitalBefore * Number(percent)) / 100);
+    setPercents((prev) => {
+      const c = { ...prev };
+      delete c[inv.id];
+      return c;
+    });
 
-    // Два типа снятия:
-    const isWithdrawalProfit = !payoutModal.reinvest; // если забирает прибыль
-    const isWithdrawalCapital = false; // здесь всегда false
+    closePayoutModal();
+  } catch (err) {
+    console.error("Ошибка createPayout:", err);
+  } finally {
+    setIsSavingPayout(false);
+  }
+};
 
-    setIsSavingPayout(true);
-
-    try {
-      // отправляем на бэкенд
-      await createPayout(
-        inv.id,
-        monthKey,
-        payoutAmount,
-        payoutModal.reinvest,
-        isWithdrawalProfit,
-        isWithdrawalCapital
-      );
-
-      const fresh = await fetchPayouts();
-
-      // из бэкенда должны прийти флаги,
-      // но если их нет — добавляем вручную
-      setPayouts(
-        fresh.map((p) => ({
-          ...p,
-          isWithdrawalProfit: !!p.isWithdrawalProfit,
-          isWithdrawalCapital: !!p.isWithdrawalCapital,
-        }))
-      );
-
-      // очистить процент у инвестора
-      setPercents((prev) => {
-        const c = { ...prev };
-        delete c[inv.id];
-        return c;
-      });
-
-      closePayoutModal();
-    } catch (err) {
-      console.error("Ошибка createPayout:", err);
-    } finally {
-      setIsSavingPayout(false);
-    }
-  };
 
   // === СНЯТИЕ КАПИТАЛА ===
-  const handleConfirmWithdraw = async () => {
-    const inv = withdrawModal.investor;
-    if (!inv) return;
+const handleConfirmWithdraw = async () => {
+  const inv = withdrawModal.investor;
+  if (!inv) return;
 
-    const clean = withdrawModal.amount.replace(/\s/g, "").replace(",", ".");
-    const amount = Number(clean);
+  const clean = withdrawModal.amount.replace(/\s/g, "").replace(",", ".");
+  const amount = Number(clean);
 
-    if (!amount || amount <= 0) {
-      closeWithdrawModal();
-      return;
-    }
+  if (!amount || amount <= 0) {
+    closeWithdrawModal();
+    return;
+  }
 
-    const monthKey = withdrawModal.monthKey || currentMonthKey;
+  const monthKey = withdrawModal.monthKey || currentMonthKey;
 
-    const payoutAmount = -Math.round(amount); // капитал снимается минусом
-    const isWithdrawalProfit = false;
-    const isWithdrawalCapital = true;
+  setIsSavingWithdraw(true);
 
-    setIsSavingWithdraw(true);
+  try {
+    // 🔴 Снятие капитала
+    await createCapitalWithdraw(inv.id, monthKey, amount);
 
-    try {
-      await createPayout(
-        inv.id,
-        monthKey,
-        payoutAmount,
-        false,
-        isWithdrawalProfit,
-        isWithdrawalCapital
-      );
+    const fresh = await fetchPayouts();
 
-      const fresh = await fetchPayouts();
+    setPayouts(
+      fresh.map((p) => ({
+        ...p,
+        isWithdrawalProfit: !!p.isWithdrawalProfit,
+        isWithdrawalCapital: !!p.isWithdrawalCapital,
+      }))
+    );
 
-      setPayouts(
-        fresh.map((p) => ({
-          ...p,
-          isWithdrawalProfit: !!p.isWithdrawalProfit,
-          isWithdrawalCapital: !!p.isWithdrawalCapital,
-        }))
-      );
+    closeWithdrawModal();
+  } catch (err) {
+    console.error("Ошибка withdrawal:", err);
+  } finally {
+    setIsSavingWithdraw(false);
+  }
+};
 
-      closeWithdrawModal();
-    } catch (err) {
-      console.error("Ошибка withdrawal:", err);
-    } finally {
-      setIsSavingWithdraw(false);
-    }
-  };
 
   // Отчёт в WhatsApp
   const handleShareReport = (inv) => {
@@ -984,12 +981,20 @@ export default function App() {
               >
                 Отмена
               </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 font-semibold shadow-md shadow-red-900/30 transition active:scale-95"
-              >
-                Удалить
-              </button>
+<button
+  onClick={handleConfirmDelete}
+  disabled={isDeleting}
+  className={`
+    px-4 py-2 rounded-lg 
+    bg-red-600 hover:bg-red-700 
+    font-semibold shadow-md shadow-red-900/30 
+    transition active:scale-95
+    ${isDeleting ? "opacity-60 cursor-not-allowed" : ""}
+  `}
+>
+  {isDeleting ? "Удаляю..." : "Удалить"}
+</button>
+
             </div>
           </div>
         </div>
