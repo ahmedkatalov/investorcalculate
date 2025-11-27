@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   fetchInvestors,
   fetchPayouts,
-  createInvestor,
   createPayout,
+  createInvestor,
 } from "./api/api";
 
 // форматирование денег в поле ввода с пробелами
@@ -47,10 +47,9 @@ export default function App() {
   const [isSavingPayout, setIsSavingPayout] = useState(false);
   const [isSavingWithdraw, setIsSavingWithdraw] = useState(false);
 
-  // оффсет для "страниц" месяцев
+  // оффсет для месячных колонок
   const [monthOffset, setMonthOffset] = useState(0);
 
-  // текущий месяц как дефолт (YYYY-MM)
   const currentMonthKey = useMemo(() => {
     const now = new Date();
     const y = now.getFullYear();
@@ -64,111 +63,93 @@ export default function App() {
     return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   }, [currentMonthKey]);
 
-  // === Загрузка данных ===
+  // Загрузка данных
   useEffect(() => {
     fetchInvestors().then((data) => {
       setInvestors(Array.isArray(data) ? data : []);
     });
 
     fetchPayouts().then((data) => {
-      setPayouts(Array.isArray(data) ? data : []);
+      setPayouts(
+        Array.isArray(data)
+          ? data.map((p) => ({
+              ...p,
+              // добавляем два типа снятия
+              isWithdrawalProfit: !!p.isWithdrawalProfit,
+              isWithdrawalCapital: !!p.isWithdrawalCapital,
+            }))
+          : []
+      );
     });
   }, []);
-
   // === ВСПОМОГАТЕЛЬНЫЕ РАСЧЁТЫ ===
 
   // суммарно реинвестировано по инвестору
   const getReinvestedTotal = (investorId) =>
     payouts.reduce((sum, p) => {
-      if (
-        p.investorId === investorId &&
-        p.reinvest &&
-        !p.isWithdrawal &&
-        (p.payoutAmount || 0) > 0
-      ) {
+      if (p.investorId === investorId && p.reinvest && !p.isWithdrawalCapital) {
         return sum + (p.payoutAmount || 0);
       }
       return sum;
     }, 0);
 
-  // суммарно снято по инвестору (как уменьшение капитала)
-  const getWithdrawnTotal = (investorId) =>
+  // суммарно снято капитала
+  const getWithdrawnCapitalTotal = (investorId) =>
     payouts.reduce((sum, p) => {
-      if (
-        p.investorId === investorId &&
-        (p.isWithdrawal || (p.payoutAmount || 0) < 0)
-      ) {
+      if (p.investorId === investorId && p.isWithdrawalCapital) {
         return sum + Math.abs(p.payoutAmount || 0);
       }
       return sum;
     }, 0);
 
-  // капитал сейчас = вложено + реинвесты - снятия
+  // капитал сейчас = вложено + реинвест - снятие капитала
   const getCapitalNow = (inv) => {
     const base = Number(inv.investedAmount || 0);
-    return base + getReinvestedTotal(inv.id) - getWithdrawnTotal(inv.id);
+    return base + getReinvestedTotal(inv.id) - getWithdrawnCapitalTotal(inv.id);
   };
 
-  // ТЕКУЩАЯ чистая прибыль = капитал сейчас - вложено
+  // текущая чистая прибыль (капитал - вложено)
   const getCurrentNetProfit = (inv) => {
     const capital = getCapitalNow(inv);
-    const base = Number(inv.investedAmount || 0);
-    return capital - base;
+    return capital - Number(inv.investedAmount || 0);
   };
 
-  // Чистая прибыль за всё время:
-  // сумма всех прибыльных начислений (реинвест + забрал),
-  // не учитываем снятия капитала и отрицательные операции
+  // общая прибыль за всё время: все + операции прибыли
   const getTotalProfitAllTime = (investorId) =>
     payouts.reduce((sum, p) => {
-      if (
-        p.investorId === investorId &&
-        !p.isWithdrawal &&
-        (p.payoutAmount || 0) > 0
-      ) {
-        return sum + (p.payoutAmount || 0);
+      if (p.investorId === investorId && p.payoutAmount > 0) {
+        return sum + p.payoutAmount;
       }
       return sum;
     }, 0);
 
-  // черновая выплата = % от текущего капитала
+  // черновая выплата
   const calcDraftPayout = (inv) => {
     const percent = percents[inv.id];
-    if (
-      percent === undefined ||
-      percent === null ||
-      percent === "" ||
-      Number.isNaN(Number(percent))
-    )
-      return 0;
+    if (!percent && percent !== 0) return 0;
 
     const capital = getCapitalNow(inv);
-    if (!capital) return 0;
     return Math.round((capital * Number(percent)) / 100);
   };
 
-  // проценты — поддержка дробных значений (5, 5.6, 5,6, 10.25 и т.п.)
+  // проценты
   const handlePercentChange = (id, rawValue) => {
-    const raw = String(rawValue);
-    const cleanedForInput = raw.replace(/[^0-9,\.]/g, "");
-    const normalized = cleanedForInput.replace(",", ".").trim();
-
-    if (normalized === "") {
-      setPercents((p) => {
-        const c = { ...p };
+    const cleaned = rawValue.replace(/[^0-9.,]/g, "").replace(",", ".");
+    if (cleaned === "") {
+      setPercents((prev) => {
+        const c = { ...prev };
         delete c[id];
         return c;
       });
       return;
     }
-
-    const num = Number(normalized);
-    if (!Number.isNaN(num)) {
-      setPercents((p) => ({ ...p, [id]: num }));
+    const n = Number(cleaned);
+    if (!Number.isNaN(n)) {
+      setPercents((p) => ({ ...p, [id]: n }));
     }
   };
 
-  // обновление инвестора на бэке
+  // обновление инвестора
   const updateInvestor = async (id, updates) => {
     try {
       const url =
@@ -183,33 +164,16 @@ export default function App() {
         body.invested_amount = updates.investedAmount;
       }
 
-      const res = await fetch(url, {
+      await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) return;
-      return res.json();
-    } catch {
-      // молча
-    }
-  };
-
-  const deleteInvestorApi = async (id) => {
-    try {
-      const url =
-        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}` +
-        `/api/investors/${id}`;
-      await fetch(url, { method: "DELETE" });
-    } catch {
-      // молча
-    }
+    } catch {}
   };
 
   const handleInvestorFieldBlur = (id, field, raw) => {
     let value = raw;
-
     if (field === "investedAmount") {
       value = Number(String(raw).replace(/\s/g, "")) || 0;
     }
@@ -221,51 +185,55 @@ export default function App() {
     updateInvestor(id, { [field]: value });
   };
 
+  // создать инвестора
   const handleCreateInvestor = async () => {
     try {
       const res = await createInvestor("Введите ФИО", 0);
 
       if (!res || !res.id) {
-        console.error("❌ Backend did not return id:", res);
+        console.error("❌ backend error:", res);
         return;
       }
 
       const fresh = await fetchInvestors();
-      setInvestors(Array.isArray(fresh) ? fresh : []);
+      setInvestors(fresh);
     } catch (err) {
       console.error("Create investor error:", err);
     }
   };
 
+  // удалить инвестора
+  const deleteInvestorApi = async (id) => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/investors/${id}`,
+        { method: "DELETE" }
+      );
+    } catch {}
+  };
+
   const handleConfirmDelete = async () => {
     if (!deletePopup.investor) return;
-    const invId = deletePopup.investor.id;
+    const id = deletePopup.investor.id;
 
-    await deleteInvestorApi(invId);
+    await deleteInvestorApi(id);
 
-    setInvestors((prev) => prev.filter((i) => i.id !== invId));
-
-    setPercents((p) => {
-      const c = { ...p };
-      delete c[invId];
-      return c;
-    });
-
-    setPayouts((prev) => prev.filter((p) => p.investorId !== invId));
+    setInvestors((prev) => prev.filter((i) => i.id !== id));
+    setPayouts((prev) => prev.filter((p) => p.investorId !== id));
 
     setDeletePopup({ show: false, investor: null });
   };
-
   // === МНОЖЕСТВЕННЫЕ КОЛОНКИ ПО МЕСЯЦАМ ===
-
   const { monthSlots, payoutsByMonthInv } = useMemo(() => {
     const byMonthInv = new Map();
 
     payouts.forEach((p) => {
       if (!p.periodMonth) return;
+
       if (!byMonthInv.has(p.periodMonth)) {
         byMonthInv.set(p.periodMonth, new Map());
       }
+
       const invMap = byMonthInv.get(p.periodMonth);
       const list = invMap.get(p.investorId) || [];
       list.push(p);
@@ -289,7 +257,6 @@ export default function App() {
     return { monthSlots: slots, payoutsByMonthInv: byMonthInv };
   }, [payouts]);
 
-  // следим, чтобы offset не вывалился за границы, когда меняется количество слотов
   useEffect(() => {
     setMonthOffset((prev) => {
       if (monthSlots.length === 0) return 0;
@@ -317,8 +284,7 @@ export default function App() {
         0,
         monthSlots.length - MAX_VISIBLE_MONTH_SLOTS
       );
-      const next = prev + MAX_VISIBLE_MONTH_SLOTS;
-      return Math.min(next, maxStart);
+      return Math.min(prev + MAX_VISIBLE_MONTH_SLOTS, maxStart);
     });
   };
 
@@ -358,44 +324,61 @@ export default function App() {
   };
 
   const closeWithdrawModal = () =>
-    setWithdrawModal({ open: false, investor: null, monthKey: "", amount: "" });
+    setWithdrawModal({
+      open: false,
+      investor: null,
+      monthKey: "",
+      amount: "",
+    });
 
-  // подтвердить выплату (через модалку)
+  // === СОХРАНЕНИЕ ВЫПЛАТЫ (3 типа операций) ===
+
   const handleConfirmPayout = async () => {
     const inv = payoutModal.investor;
     if (!inv) return;
 
     const percent = percents[inv.id];
-    if (
-      percent === undefined ||
-      percent === null ||
-      percent === "" ||
-      Number.isNaN(Number(percent))
-    ) {
+    if (percent === undefined || percent === null || percent === "") {
       closePayoutModal();
       return;
     }
 
     const monthKey = payoutModal.monthKey || currentMonthKey;
+
+    // Считаем сумму
     const capitalBefore = getCapitalNow(inv);
     const payoutAmount = Math.round((capitalBefore * Number(percent)) / 100);
+
+    // Два типа снятия:
+    const isWithdrawalProfit = !payoutModal.reinvest; // если забирает прибыль
+    const isWithdrawalCapital = false; // здесь всегда false
 
     setIsSavingPayout(true);
 
     try {
-await createPayout(
-  inv.id,
-  monthKey,
-  payoutAmount,
-  payoutModal.reinvest,
-  !payoutModal.reinvest   // ← если НЕ реинвест → снятие прибыли
-);
-
-
+      // отправляем на бэкенд
+      await createPayout(
+        inv.id,
+        monthKey,
+        payoutAmount,
+        payoutModal.reinvest,
+        isWithdrawalProfit,
+        isWithdrawalCapital
+      );
 
       const fresh = await fetchPayouts();
-      setPayouts(Array.isArray(fresh) ? fresh : []);
 
+      // из бэкенда должны прийти флаги,
+      // но если их нет — добавляем вручную
+      setPayouts(
+        fresh.map((p) => ({
+          ...p,
+          isWithdrawalProfit: !!p.isWithdrawalProfit,
+          isWithdrawalCapital: !!p.isWithdrawalCapital,
+        }))
+      );
+
+      // очистить процент у инвестора
       setPercents((prev) => {
         const c = { ...prev };
         delete c[inv.id];
@@ -410,46 +393,56 @@ await createPayout(
     }
   };
 
-  // подтвердить снятие капитала (как раньше — только локально)
+  // === СНЯТИЕ КАПИТАЛА ===
   const handleConfirmWithdraw = async () => {
     const inv = withdrawModal.investor;
     if (!inv) return;
 
-    const clean = String(withdrawModal.amount)
-      .replace(/\s/g, "")
-      .replace(",", ".");
-    const value = Number(clean);
+    const clean = withdrawModal.amount.replace(/\s/g, "").replace(",", ".");
+    const amount = Number(clean);
 
-    if (!value || value <= 0) {
+    if (!amount || amount <= 0) {
       closeWithdrawModal();
       return;
     }
 
     const monthKey = withdrawModal.monthKey || currentMonthKey;
-    const negativeAmount = -Math.round(value);
+
+    const payoutAmount = -Math.round(amount); // капитал снимается минусом
+    const isWithdrawalProfit = false;
+    const isWithdrawalCapital = true;
 
     setIsSavingWithdraw(true);
 
     try {
-      setPayouts((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-${inv.id}-withdraw-${Math.random()}`,
-          investorId: inv.id,
-          periodMonth: monthKey,
-          payoutAmount: negativeAmount,
-          reinvest: false,
-          isWithdrawal: true,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      await createPayout(
+        inv.id,
+        monthKey,
+        payoutAmount,
+        false,
+        isWithdrawalProfit,
+        isWithdrawalCapital
+      );
+
+      const fresh = await fetchPayouts();
+
+      setPayouts(
+        fresh.map((p) => ({
+          ...p,
+          isWithdrawalProfit: !!p.isWithdrawalProfit,
+          isWithdrawalCapital: !!p.isWithdrawalCapital,
+        }))
+      );
 
       closeWithdrawModal();
+    } catch (err) {
+      console.error("Ошибка withdrawal:", err);
     } finally {
       setIsSavingWithdraw(false);
     }
   };
 
+  // Отчёт в WhatsApp
   const handleShareReport = (inv) => {
     const draft = calcDraftPayout(inv);
     const capitalNow = getCapitalNow(inv);
@@ -459,25 +452,30 @@ await createPayout(
     const text = `
 📊 Отчет по инвестору: ${inv.fullName}
 
-💼 Вложено: ${fmt(inv.investedAmount || 0)} ₽
-🏦 Капитал сейчас (с реинвестами и снятиями): ${fmt(capitalNow)} ₽
+💼 Вложено: ${fmt(inv.investedAmount)} ₽
+🏦 Капитал сейчас: ${fmt(capitalNow)} ₽
 
-📈 Текущий процент: ${percents[inv.id] || 0}%
+📈 Текущий %: ${percents[inv.id] || 0}%
 💰 Черновая выплата за ${currentMonthLabel}: ${
       draft > 0 ? fmt(draft) + " ₽" : "—"
     }
 
-💹 Чистая прибыль (сейчас в капитале): ${fmt(currentNet)} ₽
-💰 Чистая прибыль за всё время: ${fmt(totalProfit)} ₽
+💹 Чистая прибыль сейчас: ${fmt(currentNet)} ₽
+💰 Прибыль за всё время: ${fmt(totalProfit)} ₽
 `.trim();
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
-
   // === РЕНДЕР ===
 
-  const filteredInvestors = investors.filter((inv) =>
-    (inv.fullName || "").toLowerCase().includes(search.toLowerCase())
+  const filteredInvestors = useMemo(
+    () =>
+      investors.filter((inv) =>
+        (inv.fullName || "")
+          .toLowerCase()
+          .includes(search.trim().toLowerCase())
+      ),
+    [investors, search]
   );
 
   return (
@@ -588,7 +586,7 @@ await createPayout(
                   %
                 </th>
 
-                {/* Черновик */}
+                {/* Выплата (черновик) */}
                 <th
                   className="
                     sticky top-0 z-40
@@ -614,13 +612,13 @@ await createPayout(
 
                 {/* Месячные ячейки */}
                 {visibleMonthSlots.map((slot, idx) => {
-                  const label = new Date(slot.month).toLocaleDateString(
-                    "ru-RU",
-                    {
-                      month: "short",
-                      year: "2-digit",
-                    }
-                  );
+                  const [y, m] = slot.month.split("-");
+                  const labelDate = new Date(Number(y), Number(m) - 1, 1);
+
+                  const label = labelDate.toLocaleDateString("ru-RU", {
+                    month: "short",
+                    year: "2-digit",
+                  });
 
                   const isFirst = idx === 0;
                   const isLast = idx === visibleMonthSlots.length - 1;
@@ -697,7 +695,7 @@ await createPayout(
                 return (
                   <tr
                     key={inv.id}
-                    className="border-b border-slate-700/50 hover:bg-slate-750/40 transition"
+                    className="border-b border-slate-700/50 hover:bg-slate-800/60 transition"
                     onDoubleClick={() =>
                       setDeletePopup({ show: true, investor: inv })
                     }
@@ -743,7 +741,10 @@ await createPayout(
                           setInvestors((prev) =>
                             prev.map((i) =>
                               i.id === inv.id
-                                ? { ...i, investedAmount: Number(raw) || 0 }
+                                ? {
+                                    ...i,
+                                    investedAmount: Number(raw) || 0,
+                                  }
                                 : i
                             )
                           );
@@ -761,7 +762,7 @@ await createPayout(
                       />
                     </td>
 
-                    {/* Капитал сейчас + снятие */}
+                    {/* Капитал сейчас + снятие капитала */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
                       <div className="flex items-center gap-2">
                         <span>{fmt(capitalNow)} ₽</span>
@@ -820,14 +821,13 @@ await createPayout(
                     {/* Выплата (черновик) */}
                     <td className="py-2 px-4 border-r border-slate-700/50 min-w-[130px] font-semibold text-emerald-400">
                       <span className="whitespace-nowrap">
-                        {draft > 0 ? fmt(draft) + " ₽" : "—"}
+                        {draft > 0 ? `${fmt(draft)} ₽` : "—"}
                       </span>
                     </td>
 
                     {/* Действия */}
                     <td className="py-2 px-4 border-r border-slate-700/50 min-w-[140px] text-center">
                       <div className="flex justify-center gap-3">
-                        {/* SAVE — открыть модалку */}
                         <button
                           onClick={() => openPayoutModal(inv)}
                           className="p-2 rounded-lg bg-slate-700/40 hover:bg-slate-600/50 border border-slate-500/40 hover:border-slate-400/60 transition active:scale-95"
@@ -865,7 +865,6 @@ await createPayout(
                           </svg>
                         </button>
 
-                        {/* SHARE */}
                         <button
                           onClick={() => handleShareReport(inv)}
                           className="p-2 rounded-lg bg-slate-700/40 hover:bg-slate-600/50 border border-slate-500/40 hover:border-slate-400/60 transition active:scale-95"
@@ -910,32 +909,40 @@ await createPayout(
                         );
                       }
 
-                      const amount = payout.payoutAmount || 0;
-                      const isNegative = amount < 0 || payout.isWithdrawal;
+                      const raw = payout.payoutAmount || 0;
+                      const abs = Math.abs(raw);
 
-                      const abs = Math.abs(amount);
+                      const isReinvest = payout.reinvest;
+                      const isWithdrawalProfit = payout.isWithdrawalProfit;
+                      const isWithdrawalCapital = payout.isWithdrawalCapital;
+
+                      let sign = "";
+                      let colorClass = "text-slate-200";
+
+                      if (isReinvest) {
+                        sign = "+";
+                        colorClass = "text-emerald-400";
+                      } else if (isWithdrawalProfit) {
+                        sign = "-";
+                        colorClass = "text-slate-400";
+                      } else if (isWithdrawalCapital) {
+                        sign = "-";
+                        colorClass = "text-red-400 font-semibold";
+                      }
 
                       return (
                         <td
                           key={`${inv.id}-${slot.month}-${slot.index}-${idx}`}
                           className="py-2 px-4 border-r border-slate-700/50 min-w-[110px]"
                         >
-                          <span
-                            className={`whitespace-nowrap ${
-                              isNegative
-                                ? "text-red-400 font-semibold"
-                                : "text-slate-100"
-                            }`}
-                          >
-                            {isNegative
-                              ? `- ${fmt(abs)} ₽`
-                              : `${fmt(abs)} ₽`}
+                          <span className={`whitespace-nowrap ${colorClass}`}>
+                            {sign} {fmt(abs)} ₽
                           </span>
                         </td>
                       );
                     })}
 
-                    {/* Чистая прибыль (сейчас в капитале) */}
+                    {/* Чистая прибыль */}
                     <td className="py-2 px-4 min-w-[140px] font-bold text-emerald-300 border-r border-slate-700/60">
                       {fmt(currentNet)} ₽
                     </td>
@@ -970,12 +977,13 @@ await createPayout(
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setDeletePopup({ show: false, investor: null })}
+                onClick={() =>
+                  setDeletePopup({ show: false, investor: null })
+                }
                 className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-500/50 transition active:scale-95"
               >
                 Отмена
               </button>
-
               <button
                 onClick={handleConfirmDelete}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 font-semibold shadow-md shadow-red-900/30 transition active:scale-95"
