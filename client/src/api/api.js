@@ -61,16 +61,22 @@ export async function fetchPayouts() {
   }));
 }
 
-export async function createPayout(investorId, periodMonth, payoutAmount, reinvest) {
+export async function createPayout(
+  investorId,
+  periodMonth,
+  payoutAmount,
+  reinvest,
+  isWithdrawal
+) {
   const res = await fetch(`${API_URL}/api/payouts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       investorId,
-      periodMonth,    // <-- "2025-02"
+      periodMonth,
       payoutAmount,
       reinvest,
-      isWithdrawal: false
+      isWithdrawal     // ← теперь передаём правильно
     }),
   });
 
@@ -81,7 +87,7 @@ export async function createPayout(investorId, periodMonth, payoutAmount, reinve
   return {
     id: p.id,
     investorId: p.investor_id,
-    periodMonth: p.period_month.slice(0, 7), // <-- нормализуем
+    periodMonth: p.period_month.slice(0, 7),
     payoutAmount: Number(p.payout_amount),
     reinvest: p.reinvest,
     isWithdrawal: p.is_withdrawal,

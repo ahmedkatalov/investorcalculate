@@ -383,7 +383,15 @@ export default function App() {
     setIsSavingPayout(true);
 
     try {
-      await createPayout(inv.id, monthKey, payoutAmount, payoutModal.reinvest);
+await createPayout(
+  inv.id,
+  monthKey,
+  payoutAmount,
+  payoutModal.reinvest,
+  !payoutModal.reinvest   // ← если НЕ реинвест → снятие прибыли
+);
+
+
 
       const fresh = await fetchPayouts();
       setPayouts(Array.isArray(fresh) ? fresh : []);
@@ -903,7 +911,8 @@ export default function App() {
                       }
 
                       const amount = payout.payoutAmount || 0;
-                      const isNegative = amount < 0;
+                      const isNegative = amount < 0 || payout.isWithdrawal;
+
                       const abs = Math.abs(amount);
 
                       return (
