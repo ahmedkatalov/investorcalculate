@@ -40,11 +40,25 @@ services:
     container_name: invest_frontend
     depends_on:
       - backend
+    expose:
+      - "80"        # внутренняя публикация в сети Docker
+
+  caddy:
+    image: caddy:latest
+    container_name: caddy_proxy
+    restart: unless-stopped
     ports:
-      - "80:80"   # 👈 ВАЖНО! Теперь фронтенд слушает домен
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
 
 volumes:
   pgdata:
-
-
+  caddy_data:
+  caddy_config:
 
