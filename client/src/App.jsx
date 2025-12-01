@@ -395,12 +395,14 @@ const handleConfirmDelete = async () => {
 
 
 const handleConfirmPayout = async () => {
-  if (savingInvestor[inv.id]) {
-  alert("Подождите, данные инвестора сохраняются...");
-  return;
-}
   const inv = payoutModal.investor;
   if (!inv) return;
+
+  // ⛔ Блокируем выплату, если ФИО или Вложено ещё сохраняется
+  if (savingInvestor[inv.id]) {
+    alert("Подождите, данные инвестора сохраняются...");
+    return;
+  }
 
   const percent = percents[inv.id];
   if (percent === undefined || percent === null || percent === "") {
@@ -432,9 +434,9 @@ const handleConfirmPayout = async () => {
       }))
     );
 
-    // 🔥 ОБЯЗАТЕЛЬНО ОБНОВИТЬ ИНВЕСТОРОВ ПОСЛЕ ВЫПЛАТЫ
-    const updatedInvestors = await fetchInvestors();
-    setInvestors(updatedInvestors);
+    // ОБНОВЛЯЕМ ИНВЕСТОРОВ
+    const updated = await fetchInvestors();
+    setInvestors(updated);
 
     // очищаем %
     setPercents((prev) => {
@@ -450,6 +452,7 @@ const handleConfirmPayout = async () => {
     setIsSavingPayout(false);
   }
 };
+
 
 
 
