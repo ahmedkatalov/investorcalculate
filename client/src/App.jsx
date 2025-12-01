@@ -393,7 +393,12 @@ const handleConfirmDelete = async () => {
 
   // === СОХРАНЕНИЕ ВЫПЛАТЫ (3 типа операций) ===
 
+
 const handleConfirmPayout = async () => {
+  if (savingInvestor[inv.id]) {
+  alert("Подождите, данные инвестора сохраняются...");
+  return;
+}
   const inv = payoutModal.investor;
   if (!inv) return;
 
