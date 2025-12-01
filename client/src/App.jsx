@@ -120,6 +120,19 @@ export default function App() {
     return capital - Number(inv.investedAmount || 0);
   };
 
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+const debouncedUpdateInvestor = useMemo(
+  () => debounce(updateInvestor, 300),
+  []
+);
+
   // общая прибыль за всё время: все + операции прибыли
   const getTotalProfitAllTime = (investorId) =>
     payouts.reduce((sum, p) => {
@@ -730,61 +743,54 @@ const handleConfirmWithdraw = async () => {
                     </td>
 
                     {/* ФИО */}
-                    <td className="py-2 px-4 border-r border-slate-700/50">
-                      <input
-                        type="text"
-                        value={inv.fullName || ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setInvestors((prev) =>
-                            prev.map((i) =>
-                              i.id === inv.id ? { ...i, fullName: v } : i
-                            )
-                          );
-                        }}
-                        onBlur={(e) =>
-                          handleInvestorFieldBlur(
-                            inv.id,
-                            "fullName",
-                            e.target.value
-                          )
-                        }
-                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-                        placeholder="Введите ФИО"
-                      />
-                    </td>
+<td className="py-2 px-4 border-r border-slate-700/50">
+  <input
+    type="text"
+    value={inv.fullName || ""}
+    onChange={(e) => {
+      const v = e.target.value;
+
+      // локальное обновление
+      setInvestors((prev) =>
+        prev.map((i) =>
+          i.id === inv.id ? { ...i, fullName: v } : i
+        )
+      );
+
+      // ⚡ авто-сохранение в базу
+      debouncedUpdateInvestor(inv.id, { fullName: v });
+    }}
+    className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+    placeholder="Введите ФИО"
+  />
+</td>
+
 
                     {/* Вложено */}
-                    <td className="py-2 px-4 border-r border-slate-700/50">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatMoneyInput(inv.investedAmount ?? "")}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/\s/g, "");
-                          setInvestors((prev) =>
-                            prev.map((i) =>
-                              i.id === inv.id
-                                ? {
-                                    ...i,
-                                    investedAmount: Number(raw) || 0,
-                                  }
-                                : i
-                            )
-                          );
-                        }}
-                        onBlur={(e) => {
-                          const clean = e.target.value.replace(/\s/g, "");
-                          handleInvestorFieldBlur(
-                            inv.id,
-                            "investedAmount",
-                            clean
-                          );
-                        }}
-                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-                        placeholder="0"
-                      />
-                    </td>
+<td className="py-2 px-4 border-r border-slate-700/50">
+  <input
+    type="text"
+    inputMode="numeric"
+    value={formatMoneyInput(inv.investedAmount ?? "")}
+    onChange={(e) => {
+      const raw = e.target.value.replace(/\s/g, "");
+      const num = Number(raw) || 0;
+
+      // локальное обновление
+      setInvestors((prev) =>
+        prev.map((i) =>
+          i.id === inv.id ? { ...i, investedAmount: num } : i
+        )
+      );
+
+      // ⚡ авто-сохранение в базу
+      debouncedUpdateInvestor(inv.id, { investedAmount: num });
+    }}
+    className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+    placeholder="0"
+  />
+</td>
+
 
                     {/* Капитал сейчас + снятие капитала */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
