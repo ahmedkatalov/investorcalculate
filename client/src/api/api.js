@@ -1,17 +1,16 @@
-export const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+// client/src/api/api.js
 
-/*
-  👉 Если VITE_API_URL пустая строка — API_URL = ""
-  👉 Тогда запросы будут `/api/...`
-  👉 Если VITE_API_URL="https://investorcalc.ru/api"
-     API_URL = "https://investorcalc.ru/api"
-*/
+// ✅ Базовый URL для API — всегда начинается с /api
+export const API_URL =
+  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim() !== ""
+    ? import.meta.env.VITE_API_URL
+    : "/api";
 
 function authHeaders() {
   const token = localStorage.getItem("token");
   return {
     "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
@@ -20,10 +19,10 @@ function authHeaders() {
 //
 
 export async function registerUser(email, password, secretCode) {
-  const res = await fetch(`${API_URL}/api/register`, {
+  const res = await fetch(`${API_URL}/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, secretCode })
+    body: JSON.stringify({ email, password, secretCode }),
   });
 
   const data = await res.json();
@@ -34,10 +33,10 @@ export async function registerUser(email, password, secretCode) {
 }
 
 export async function loginUser(email, password) {
-  const res = await fetch(`${API_URL}/api/login`, {
+  const res = await fetch(`${API_URL}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
 
   const data = await res.json();
@@ -52,30 +51,30 @@ export async function loginUser(email, password) {
 //
 
 export async function fetchInvestors() {
-  const res = await fetch(`${API_URL}/api/investors`, {
-    headers: authHeaders()
+  const res = await fetch(`${API_URL}/investors`, {
+    headers: authHeaders(),
   });
 
   if (!res.ok) return [];
 
   const data = await res.json();
 
-  return data.map(i => ({
+  return data.map((i) => ({
     id: i.id,
     fullName: i.full_name,
     investedAmount: Number(i.invested_amount),
-    createdAt: i.created_at
+    createdAt: i.created_at,
   }));
 }
 
 export async function createInvestor(fullName, investedAmount) {
-  const res = await fetch(`${API_URL}/api/investors`, {
+  const res = await fetch(`${API_URL}/investors`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
       full_name: fullName,
-      invested_amount: investedAmount
-    })
+      invested_amount: investedAmount,
+    }),
   });
 
   const data = await res.json();
@@ -85,7 +84,7 @@ export async function createInvestor(fullName, investedAmount) {
     id: data.id,
     fullName: data.full_name,
     investedAmount: Number(data.invested_amount),
-    createdAt: data.created_at
+    createdAt: data.created_at,
   };
 }
 
@@ -94,14 +93,14 @@ export async function createInvestor(fullName, investedAmount) {
 //
 
 export async function fetchPayouts() {
-  const res = await fetch(`${API_URL}/api/payouts`, {
-    headers: authHeaders()
+  const res = await fetch(`${API_URL}/payouts`, {
+    headers: authHeaders(),
   });
   if (!res.ok) return [];
 
   const data = await res.json();
 
-  return data.map(p => ({
+  return data.map((p) => ({
     id: p.id,
     investorId: p.investor_id,
     periodMonth: p.period_month.slice(0, 7),
@@ -109,13 +108,13 @@ export async function fetchPayouts() {
     reinvest: p.reinvest,
     isWithdrawalProfit: p.is_withdrawal_profit,
     isWithdrawalCapital: p.is_withdrawal_capital,
-    createdAt: p.created_at
+    createdAt: p.created_at,
   }));
 }
 
 // ► Реинвест
 export async function createReinvest(investorId, periodMonth, amount) {
-  const res = await fetch(`${API_URL}/api/payouts`, {
+  const res = await fetch(`${API_URL}/payouts`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
@@ -124,8 +123,8 @@ export async function createReinvest(investorId, periodMonth, amount) {
       payoutAmount: amount,
       reinvest: true,
       isWithdrawalProfit: false,
-      isWithdrawalCapital: false
-    })
+      isWithdrawalCapital: false,
+    }),
   });
 
   const data = await res.json();
@@ -136,7 +135,7 @@ export async function createReinvest(investorId, periodMonth, amount) {
 
 // ► Забрал прибыль
 export async function createTakeProfit(investorId, periodMonth, amount) {
-  const res = await fetch(`${API_URL}/api/payouts`, {
+  const res = await fetch(`${API_URL}/payouts`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
@@ -145,8 +144,8 @@ export async function createTakeProfit(investorId, periodMonth, amount) {
       payoutAmount: amount,
       reinvest: false,
       isWithdrawalProfit: true,
-      isWithdrawalCapital: false
-    })
+      isWithdrawalCapital: false,
+    }),
   });
 
   const data = await res.json();
@@ -157,7 +156,7 @@ export async function createTakeProfit(investorId, periodMonth, amount) {
 
 // ► Снял капитал
 export async function createCapitalWithdraw(investorId, periodMonth, amount) {
-  const res = await fetch(`${API_URL}/api/payouts`, {
+  const res = await fetch(`${API_URL}/payouts`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
@@ -166,8 +165,8 @@ export async function createCapitalWithdraw(investorId, periodMonth, amount) {
       payoutAmount: -Math.abs(amount),
       reinvest: false,
       isWithdrawalProfit: false,
-      isWithdrawalCapital: true
-    })
+      isWithdrawalCapital: true,
+    }),
   });
 
   const data = await res.json();
