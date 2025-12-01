@@ -1,20 +1,27 @@
-import { useEffect, useMemo, useState } from "react"; import { fetchInvestors, fetchPayouts, createReinvest, createTakeProfit, createCapitalWithdraw, createInvestor, } from "./api/api"; 
+import { useEffect, useMemo, useState } from "react";
+import {
+  fetchInvestors,
+  fetchPayouts,
+  createReinvest,
+  createTakeProfit,
+  createCapitalWithdraw,
+  createInvestor,
+} from "./api/api";
 
-// форматирование денег в поле ввода с пробелами 
-const formatMoneyInput = (value) => { const numeric = String(value ?? "").replace(/\s/g, ""); if (!/^\d*$/.test(numeric)) return value; return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, " "); }; // форматирование денег для отображения 
-const fmt = (v) => typeof v === "number" ? new Intl.NumberFormat("ru-RU").format(v) : v; 
- 
+
+// форматирование денег в поле ввода с пробелами
+const formatMoneyInput = (value) => {
+
+  const numeric = String(value ?? "").replace(/\s/g, "");
+  if (!/^\d*$/.test(numeric)) return value;
+  return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+};
+
+// форматирование денег для отображения
+const fmt = (v) =>
+  typeof v === "number" ? new Intl.NumberFormat("ru-RU").format(v) : v;
+
 const MAX_VISIBLE_MONTH_SLOTS = 4;
-// =========================
-//  ДЕБАУНЕР (ДОЛЖЕН ИДТИ ВЫШЕ ВСЕГО)
-// =========================
-function debounce(fn, delay) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
 
 export default function App() {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -45,24 +52,24 @@ export default function App() {
 
   const [isSavingPayout, setIsSavingPayout] = useState(false);
   const [isSavingWithdraw, setIsSavingWithdraw] = useState(false);
+
+  // оффсет для месячных колонок
   const [monthOffset, setMonthOffset] = useState(0);
 
   const currentMonthKey = useMemo(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
   }, []);
 
   const currentMonthLabel = useMemo(() => {
     const [y, m] = currentMonthKey.split("-");
-    return new Date(+y, +m - 1, 1).toLocaleDateString("ru-RU", {
-      month: "long",
-      year: "numeric",
-    });
+    const d = new Date(Number(y), Number(m) - 1, 1);
+    return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   }, [currentMonthKey]);
 
-  // =========================
-  //  ЗАГРУЗКА ДАННЫХ
-  // =========================
+  // Загрузка данных
   useEffect(() => {
     fetchInvestors().then((data) => {
       setInvestors(Array.isArray(data) ? data : []);
@@ -73,6 +80,7 @@ export default function App() {
         Array.isArray(data)
           ? data.map((p) => ({
               ...p,
+              // добавляем два типа снятия
               isWithdrawalProfit: !!p.isWithdrawalProfit,
               isWithdrawalCapital: !!p.isWithdrawalCapital,
             }))
@@ -80,108 +88,122 @@ export default function App() {
       );
     });
   }, []);
+  // === ВСПОМОГАТЕЛЬНЫЕ РАСЧЁТЫ ===
 
-  // =========================
-  //  ПОДСЧЁТ ФИНАНСОВ
-  // =========================
-  const getReinvestedTotal = (id) =>
+  // суммарно реинвестировано по инвестору
+  const getReinvestedTotal = (investorId) =>
     payouts.reduce((sum, p) => {
-      if (p.investorId === id && p.reinvest && !p.isWithdrawalCapital)
+      if (p.investorId === investorId && p.reinvest && !p.isWithdrawalCapital) {
         return sum + (p.payoutAmount || 0);
+      }
       return sum;
     }, 0);
 
-  const getWithdrawnCapitalTotal = (id) =>
+  // суммарно снято капитала
+  const getWithdrawnCapitalTotal = (investorId) =>
     payouts.reduce((sum, p) => {
-      if (p.investorId === id && p.isWithdrawalCapital)
+      if (p.investorId === investorId && p.isWithdrawalCapital) {
         return sum + Math.abs(p.payoutAmount || 0);
+      }
       return sum;
     }, 0);
 
-  const getCapitalNow = (inv) =>
-    Number(inv.investedAmount || 0) +
-    getReinvestedTotal(inv.id) -
-    getWithdrawnCapitalTotal(inv.id);
+  // капитал сейчас = вложено + реинвест - снятие капитала
+  const getCapitalNow = (inv) => {
+    const base = Number(inv.investedAmount || 0);
+    return base + getReinvestedTotal(inv.id) - getWithdrawnCapitalTotal(inv.id);
+  };
 
-  const getCurrentNetProfit = (inv) =>
-    getCapitalNow(inv) - Number(inv.investedAmount || 0);
+  // текущая чистая прибыль (капитал - вложено)
+  const getCurrentNetProfit = (inv) => {
+    const capital = getCapitalNow(inv);
+    return capital - Number(inv.investedAmount || 0);
+  };
 
-  // =========================
-  //  ОБНОВЛЕНИЕ ИНВЕСТОРА (Важно: ДОЛЖНО БЫТЬ ВЫШЕ debouncedUpdateInvestor)
-  // =========================
+  // общая прибыль за всё время: все + операции прибыли
+  const getTotalProfitAllTime = (investorId) =>
+    payouts.reduce((sum, p) => {
+      if (p.investorId === investorId && p.payoutAmount > 0) {
+        return sum + p.payoutAmount;
+      }
+      return sum;
+    }, 0);
+
+  // черновая выплата
+  const calcDraftPayout = (inv) => {
+    const percent = percents[inv.id];
+    if (!percent && percent !== 0) return 0;
+
+    const capital = getCapitalNow(inv);
+    return Math.round((capital * Number(percent)) / 100);
+  };
+
+  // проценты
+const handlePercentChange = (id, rawValue) => {
+  // оставляем только цифры, точки и запятые
+  let v = rawValue.replace(/[^0-9.,]/g, "");
+
+  // все запятые -> точки
+  v = v.replace(/,/g, ".");
+
+  // оставляем только одну точку (первую), остальные выкидываем
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    v =
+      v.slice(0, firstDot + 1) +
+      v
+        .slice(firstDot + 1)
+        .replace(/\./g, "");
+  }
+
+  // если поле очистили – удаляем процент
+  if (v === "") {
+    setPercents((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    return;
+  }
+
+  // на onChange НИЧЕГО не парсим в Number, просто храним строку
+  setPercents((prev) => ({ ...prev, [id]: v }));
+};
+
+const handlePercentBlur = (id) => {
+  const v = percents[id];
+  if (!v && v !== 0) return;
+
+  const num = Number(String(v).replace(/,/g, "."));
+  if (!Number.isNaN(num)) {
+    // на blur приводим к числу
+    setPercents((prev) => ({ ...prev, [id]: num }));
+  }
+};
+
+
+  // обновление инвестора
   const updateInvestor = async (id, updates) => {
     try {
-      const url = `${import.meta.env.VITE_API_URL}/api/investors/${id}`;
+      const url =
+        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}` +
+        `/api/investors/${id}`;
 
       const body = {};
-      if ("fullName" in updates) body.full_name = updates.fullName;
-      if ("investedAmount" in updates)
+      if ("fullName" in updates) {
+        body.full_name = updates.fullName;
+      }
+      if ("investedAmount" in updates) {
         body.invested_amount = updates.investedAmount;
+      }
 
       await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-    } catch (e) {}
+    } catch {}
   };
-
-  // =========================
-  //  ДЕБАУНС ОБНОВЛЕНИЯ (ДОЛЖЕН ИДТИ ПОСЛЕ updateInvestor)
-  // =========================
-  const debouncedUpdateInvestor = useMemo(
-    () => debounce(updateInvestor, 400),
-    []
-  );
-
-  // =========================
-  // ПРОФИТЫ
-  // =========================
-  const getTotalProfitAllTime = (id) =>
-    payouts.reduce((sum, p) => {
-      if (p.investorId === id && p.payoutAmount > 0) return sum + p.payoutAmount;
-      return sum;
-    }, 0);
-
-  const calcDraftPayout = (inv) => {
-    const percent = percents[inv.id];
-    if (!percent && percent !== 0) return 0;
-    return Math.round((getCapitalNow(inv) * Number(percent)) / 100);
-  };
-
-  // =========================
-  // ПРОЦЕНТЫ
-  // =========================
-  const handlePercentChange = (id, rawValue) => {
-    let v = rawValue.replace(/[^0-9.,]/g, "").replace(/,/g, ".");
-    const firstDot = v.indexOf(".");
-    if (firstDot !== -1)
-      v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
-    if (v === "") {
-      setPercents((prev) => {
-        const c = { ...prev };
-        delete c[id];
-        return c;
-      });
-      return;
-    }
-    setPercents((prev) => ({ ...prev, [id]: v }));
-  };
-
-  const handlePercentBlur = (id) => {
-    const v = percents[id];
-    if (!v && v !== 0) return;
-    const num = Number(String(v).replace(/,/g, "."));
-    if (!isNaN(num))
-      setPercents((prev) => ({ ...prev, [id]: num }));
-  };
-
-  // =========================
-  //  ПОЛНАЯ ВЕРСИЯ КОДА ДАЛЬШЕ НЕ МЕНЯЛАСЬ
-  // (таблицы, действия, модалки — остаются как есть)
-  // =========================
-
-
 
   const handleInvestorFieldBlur = (id, field, raw) => {
     let value = raw;
@@ -708,54 +730,61 @@ const handleConfirmWithdraw = async () => {
                     </td>
 
                     {/* ФИО */}
-<td className="py-2 px-4 border-r border-slate-700/50">
-  <input
-    type="text"
-    value={inv.fullName || ""}
-    onChange={(e) => {
-      const v = e.target.value;
-
-      // локальное обновление
-      setInvestors((prev) =>
-        prev.map((i) =>
-          i.id === inv.id ? { ...i, fullName: v } : i
-        )
-      );
-
-      // ⚡ авто-сохранение в базу
-      debouncedUpdateInvestor(inv.id, { fullName: v });
-    }}
-    className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-    placeholder="Введите ФИО"
-  />
-</td>
-
+                    <td className="py-2 px-4 border-r border-slate-700/50">
+                      <input
+                        type="text"
+                        value={inv.fullName || ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setInvestors((prev) =>
+                            prev.map((i) =>
+                              i.id === inv.id ? { ...i, fullName: v } : i
+                            )
+                          );
+                        }}
+                        onBlur={(e) =>
+                          handleInvestorFieldBlur(
+                            inv.id,
+                            "fullName",
+                            e.target.value
+                          )
+                        }
+                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+                        placeholder="Введите ФИО"
+                      />
+                    </td>
 
                     {/* Вложено */}
-<td className="py-2 px-4 border-r border-slate-700/50">
-  <input
-    type="text"
-    inputMode="numeric"
-    value={formatMoneyInput(inv.investedAmount ?? "")}
-    onChange={(e) => {
-      const raw = e.target.value.replace(/\s/g, "");
-      const num = Number(raw) || 0;
-
-      // локальное обновление
-      setInvestors((prev) =>
-        prev.map((i) =>
-          i.id === inv.id ? { ...i, investedAmount: num } : i
-        )
-      );
-
-      // ⚡ авто-сохранение в базу
-      debouncedUpdateInvestor(inv.id, { investedAmount: num });
-    }}
-    className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-    placeholder="0"
-  />
-</td>
-
+                    <td className="py-2 px-4 border-r border-slate-700/50">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInput(inv.investedAmount ?? "")}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/\s/g, "");
+                          setInvestors((prev) =>
+                            prev.map((i) =>
+                              i.id === inv.id
+                                ? {
+                                    ...i,
+                                    investedAmount: Number(raw) || 0,
+                                  }
+                                : i
+                            )
+                          );
+                        }}
+                        onBlur={(e) => {
+                          const clean = e.target.value.replace(/\s/g, "");
+                          handleInvestorFieldBlur(
+                            inv.id,
+                            "investedAmount",
+                            clean
+                          );
+                        }}
+                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+                        placeholder="0"
+                      />
+                    </td>
 
                     {/* Капитал сейчас + снятие капитала */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
