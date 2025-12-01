@@ -1,3 +1,10 @@
+import { useEffect, useMemo, useState } from "react"; import { fetchInvestors, fetchPayouts, createReinvest, createTakeProfit, createCapitalWithdraw, createInvestor, } from "./api/api"; 
+
+// форматирование денег в поле ввода с пробелами 
+const formatMoneyInput = (value) => { const numeric = String(value ?? "").replace(/\s/g, ""); if (!/^\d*$/.test(numeric)) return value; return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, " "); }; // форматирование денег для отображения 
+const fmt = (v) => typeof v === "number" ? new Intl.NumberFormat("ru-RU").format(v) : v; 
+ 
+const MAX_VISIBLE_MONTH_SLOTS = 4;
 // =========================
 //  ДЕБАУНЕР (ДОЛЖЕН ИДТИ ВЫШЕ ВСЕГО)
 // =========================
