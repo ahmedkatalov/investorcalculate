@@ -407,13 +407,12 @@ const handleConfirmPayout = async () => {
 
   try {
     if (payoutModal.reinvest) {
-      // 🔵 Реинвест
       await createReinvest(inv.id, monthKey, payoutAmount);
     } else {
-      // 🟡 Забрал прибыль
       await createTakeProfit(inv.id, monthKey, payoutAmount);
     }
 
+    // обновляем выплаты
     const fresh = await fetchPayouts();
     setPayouts(
       fresh.map((p) => ({
@@ -423,6 +422,11 @@ const handleConfirmPayout = async () => {
       }))
     );
 
+    // 🔥 ОБЯЗАТЕЛЬНО ОБНОВИТЬ ИНВЕСТОРОВ ПОСЛЕ ВЫПЛАТЫ
+    const updatedInvestors = await fetchInvestors();
+    setInvestors(updatedInvestors);
+
+    // очищаем %
     setPercents((prev) => {
       const c = { ...prev };
       delete c[inv.id];
@@ -436,6 +440,7 @@ const handleConfirmPayout = async () => {
     setIsSavingPayout(false);
   }
 };
+
 
 
   // === СНЯТИЕ КАПИТАЛА ===
