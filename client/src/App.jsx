@@ -187,8 +187,8 @@ export default function App() {
     setSavingInvestor((prev) => ({ ...prev, [id]: true }));
 
 try {
-  const baseUrl = import.meta.env.VITE_API_URL;   // 🔥 убрали localhost
-  const url = `${baseUrl}/api/investors/${id}`;
+const baseUrl = import.meta.env.VITE_API_URL || "/api";
+const url = `${baseUrl}/investors/${id}`;  // ← ПРАВИЛЬНО
 
   const body = {};
   if (updates.fullName !== undefined) body.full_name = updates.fullName;
@@ -232,7 +232,7 @@ try {
 const deleteInvestorApi = async (id) => {
   try {
     const baseUrl = import.meta.env.VITE_API_URL;  // 🔥 без локального fallback
-    await fetch(`${baseUrl}/api/investors/${id}`, {
+    await fetch(`${baseUrl}/investors/${id}`, {
       method: "DELETE",
     });
   } catch {}
