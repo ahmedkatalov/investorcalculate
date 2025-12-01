@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { API_URL } from "./api/api";
+
 import {
   fetchInvestors,
   fetchPayouts,
@@ -184,23 +186,24 @@ export default function App() {
   const updateInvestor = async (id, updates) => {
     setSavingInvestor((prev) => ({ ...prev, [id]: true }));
 
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
-      const url = `${baseUrl}/api/investors/${id}`;
+try {
+  const baseUrl = import.meta.env.VITE_API_URL;   // 🔥 убрали localhost
+  const url = `${baseUrl}/api/investors/${id}`;
 
-      const body = {};
-      if (updates.fullName !== undefined) body.full_name = updates.fullName;
-      if (updates.investedAmount !== undefined)
-        body.invested_amount = updates.investedAmount;
+  const body = {};
+  if (updates.fullName !== undefined) body.full_name = updates.fullName;
+  if (updates.investedAmount !== undefined)
+    body.invested_amount = updates.investedAmount;
 
-      await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } finally {
-      setSavingInvestor((prev) => ({ ...prev, [id]: false }));
-    }
+  await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+} finally {
+  setSavingInvestor((prev) => ({ ...prev, [id]: false }));
+}
+
   };
 
   const debouncedUpdateInvestor = useMemo(
@@ -226,14 +229,15 @@ export default function App() {
   };
 
   // ====== удаление инвестора ======
-  const deleteInvestorApi = async (id) => {
-    try {
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
-      await fetch(`${baseUrl}/api/investors/${id}`, {
-        method: "DELETE",
-      });
-    } catch {}
-  };
+const deleteInvestorApi = async (id) => {
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL;  // 🔥 без локального fallback
+    await fetch(`${baseUrl}/api/investors/${id}`, {
+      method: "DELETE",
+    });
+  } catch {}
+};
+
 
   const handleConfirmDelete = async () => {
     if (!deletePopup.investor) return;
