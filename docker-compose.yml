@@ -16,7 +16,8 @@ services:
       - ./db/migrations:/docker-entrypoint-initdb.d
 
   backend:
-    build: ./server
+    build:
+      context: ./server
     restart: unless-stopped
     container_name: invest_backend
     depends_on:
@@ -31,17 +32,20 @@ services:
       CORS_ORIGIN: "*"
       SECRET_REG_CODE: "BM887700"
       JWT_SECRET: "jwt_secret_key_123"
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
 
   frontend:
-    build: ./client
+    build:
+      context: ./client
+      args:
+        VITE_API_URL=/api
     restart: unless-stopped
     container_name: invest_frontend
     depends_on:
       - backend
     expose:
-      - "80"        # внутренняя публикация в сети Docker
+      - "80"
 
   caddy:
     image: caddy:latest
@@ -56,9 +60,9 @@ services:
       - caddy_config:/config
     depends_on:
       - frontend
+      - backend
 
 volumes:
   pgdata:
   caddy_data:
   caddy_config:
-
