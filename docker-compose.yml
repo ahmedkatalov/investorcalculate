@@ -35,17 +35,19 @@ services:
     expose:
       - "8080"
 
-  frontend:
-    build:
-      context: ./client
-      args:
-        VITE_API_URL=/api
-    restart: unless-stopped
-    container_name: invest_frontend
-    depends_on:
-      - backend
-    expose:
-      - "80"
+frontend:
+  build:
+    context: ./client
+    dockerfile: Dockerfile
+    args:
+      VITE_API_URL: "/api"
+  restart: unless-stopped
+  container_name: invest_frontend
+  depends_on:
+    - backend
+  expose:
+    - "80"
+
 
   caddy:
     image: caddy:latest
