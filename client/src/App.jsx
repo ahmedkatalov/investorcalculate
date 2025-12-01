@@ -18,7 +18,6 @@ function debounce(fn, delay) {
 
 // форматирование денег в поле ввода с пробелами
 const formatMoneyInput = (value) => {
-
   const numeric = String(value ?? "").replace(/\s/g, "");
   if (!/^\d*$/.test(numeric)) return value;
   return numeric.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -32,7 +31,6 @@ const MAX_VISIBLE_MONTH_SLOTS = 4;
 
 export default function App() {
   const [savingInvestor, setSavingInvestor] = useState({});
-
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [investors, setInvestors] = useState([]);
@@ -78,7 +76,7 @@ export default function App() {
     return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   }, [currentMonthKey]);
 
-  // Загрузка данных
+  // ====== загрузка данных ======
   useEffect(() => {
     fetchInvestors().then((data) => {
       setInvestors(Array.isArray(data) ? data : []);
@@ -89,7 +87,6 @@ export default function App() {
         Array.isArray(data)
           ? data.map((p) => ({
               ...p,
-              // добавляем два типа снятия
               isWithdrawalProfit: !!p.isWithdrawalProfit,
               isWithdrawalCapital: !!p.isWithdrawalCapital,
             }))
@@ -97,7 +94,8 @@ export default function App() {
       );
     });
   }, []);
-  // === ВСПОМОГАТЕЛЬНЫЕ РАСЧЁТЫ ===
+
+  // ====== расчёты ======
 
   // суммарно реинвестировано по инвестору
   const getReinvestedTotal = (investorId) =>
@@ -147,95 +145,70 @@ export default function App() {
     return Math.round((capital * Number(percent)) / 100);
   };
 
-  // проценты
-const handlePercentChange = (id, rawValue) => {
-  // оставляем только цифры, точки и запятые
-  let v = rawValue.replace(/[^0-9.,]/g, "");
-
-  // все запятые -> точки
-  v = v.replace(/,/g, ".");
-
-  // оставляем только одну точку (первую), остальные выкидываем
-  const firstDot = v.indexOf(".");
-  if (firstDot !== -1) {
-    v =
-      v.slice(0, firstDot + 1) +
-      v
-        .slice(firstDot + 1)
-        .replace(/\./g, "");
-  }
-
-  // если поле очистили – удаляем процент
-  if (v === "") {
-    setPercents((prev) => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
-    return;
-  }
-
-  // на onChange НИЧЕГО не парсим в Number, просто храним строку
-  setPercents((prev) => ({ ...prev, [id]: v }));
-};
-
-const handlePercentBlur = (id) => {
-  const v = percents[id];
-  if (!v && v !== 0) return;
-
-  const num = Number(String(v).replace(/,/g, "."));
-  if (!Number.isNaN(num)) {
-    // на blur приводим к числу
-    setPercents((prev) => ({ ...prev, [id]: num }));
-  }
-};
-
-
-  // обновление инвестора
-const updateInvestor = async (id, updates) => {
-  setSavingInvestor(prev => ({ ...prev, [id]: true }));
-
-  try {
-    const url =
-      `${import.meta.env.VITE_API_URL}` +
-      `/api/investors/${id}`;
-
-    const body = {};
-    if (updates.fullName !== undefined) body.full_name = updates.fullName;
-    if (updates.investedAmount !== undefined)
-      body.invested_amount = updates.investedAmount;
-
-    await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-  } finally {
-    setSavingInvestor(prev => ({ ...prev, [id]: false }));
-  }
-};
-
-
-  const handleInvestorFieldBlur = (id, field, raw) => {
-    let value = raw;
-    if (field === "investedAmount") {
-      value = Number(String(raw).replace(/\s/g, "")) || 0;
+  // ====== проценты ======
+  const handlePercentChange = (id, rawValue) => {
+    let v = rawValue.replace(/[^0-9.,]/g, "");
+    v = v.replace(/,/g, ".");
+    const firstDot = v.indexOf(".");
+    if (firstDot !== -1) {
+      v =
+        v.slice(0, firstDot + 1) +
+        v
+          .slice(firstDot + 1)
+          .replace(/\./g, "");
     }
 
-    setInvestors((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, [field]: value } : i))
-    );
+    if (v === "") {
+      setPercents((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      return;
+    }
 
-    updateInvestor(id, { [field]: value });
+    setPercents((prev) => ({ ...prev, [id]: v }));
   };
 
-const debouncedUpdateInvestor = useMemo(
-  () => debounce(updateInvestor, 1500),
-  []
-);
+  const handlePercentBlur = (id) => {
+    const v = percents[id];
+    if (!v && v !== 0) return;
 
-  // создать инвестора
+    const num = Number(String(v).replace(/,/g, "."));
+    if (!Number.isNaN(num)) {
+      setPercents((prev) => ({ ...prev, [id]: num }));
+    }
+  };
+
+  // ====== обновление инвестора (автосохранение) ======
+  const updateInvestor = async (id, updates) => {
+    setSavingInvestor((prev) => ({ ...prev, [id]: true }));
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const url = `${baseUrl}/api/investors/${id}`;
+
+      const body = {};
+      if (updates.fullName !== undefined) body.full_name = updates.fullName;
+      if (updates.investedAmount !== undefined)
+        body.invested_amount = updates.investedAmount;
+
+      await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } finally {
+      setSavingInvestor((prev) => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const debouncedUpdateInvestor = useMemo(
+    () => debounce(updateInvestor, 800),
+    []
+  );
+
+  // ====== создание инвестора ======
   const handleCreateInvestor = async () => {
     try {
       const res = await createInvestor("", 0);
@@ -246,44 +219,43 @@ const debouncedUpdateInvestor = useMemo(
       }
 
       const fresh = await fetchInvestors();
-      setInvestors(fresh);
+      setInvestors(Array.isArray(fresh) ? fresh : []);
     } catch (err) {
       console.error("Create investor error:", err);
     }
   };
 
-  // удалить инвестора
+  // ====== удаление инвестора ======
   const deleteInvestorApi = async (id) => {
     try {
-      await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/investors/${id}`,
-        { method: "DELETE" }
-      );
+      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      await fetch(`${baseUrl}/api/investors/${id}`, {
+        method: "DELETE",
+      });
     } catch {}
   };
 
-const handleConfirmDelete = async () => {
-  if (!deletePopup.investor) return;
+  const handleConfirmDelete = async () => {
+    if (!deletePopup.investor) return;
 
-  setIsDeleting(true);
+    setIsDeleting(true);
+    const id = deletePopup.investor.id;
 
-  const id = deletePopup.investor.id;
+    try {
+      await deleteInvestorApi(id);
 
-  try {
-    await deleteInvestorApi(id);
+      setInvestors((prev) => prev.filter((i) => i.id !== id));
+      setPayouts((prev) => prev.filter((p) => p.investorId !== id));
 
-    setInvestors((prev) => prev.filter((i) => i.id !== id));
-    setPayouts((prev) => prev.filter((p) => p.investorId !== id));
+      setDeletePopup({ show: false, investor: null });
+    } catch (err) {
+      console.error("Ошибка удаления:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-    setDeletePopup({ show: false, investor: null });
-  } catch (err) {
-    console.error("Ошибка удаления:", err);
-  } finally {
-    setIsDeleting(false);
-  }
-};
-
-  // === МНОЖЕСТВЕННЫЕ КОЛОНКИ ПО МЕСЯЦАМ ===
+  // ====== МНОЖЕСТВЕННЫЕ КОЛОНКИ ПО МЕСЯЦАМ ======
   const { monthSlots, payoutsByMonthInv } = useMemo(() => {
     const byMonthInv = new Map();
 
@@ -355,7 +327,7 @@ const handleConfirmDelete = async () => {
     return list[slot.index] || null;
   };
 
-  // === МОДАЛКИ ===
+  // ====== МОДАЛКИ ======
 
   const openPayoutModal = (inv) => {
     setPayoutModal({
@@ -391,112 +363,101 @@ const handleConfirmDelete = async () => {
       amount: "",
     });
 
-  // === СОХРАНЕНИЕ ВЫПЛАТЫ (3 типа операций) ===
+  // ====== СОХРАНЕНИЕ ВЫПЛАТЫ ======
 
+  const handleConfirmPayout = async () => {
+    const inv = payoutModal.investor;
+    if (!inv) return;
 
-const handleConfirmPayout = async () => {
-  const inv = payoutModal.investor;
-  if (!inv) return;
-
-  // ⛔ Блокируем выплату, если ФИО или Вложено ещё сохраняется
-  if (savingInvestor[inv.id]) {
-    alert("Подождите, данные инвестора сохраняются...");
-    return;
-  }
-
-  const percent = percents[inv.id];
-  if (percent === undefined || percent === null || percent === "") {
-    closePayoutModal();
-    return;
-  }
-
-  const monthKey = payoutModal.monthKey || currentMonthKey;
-
-  const capitalBefore = getCapitalNow(inv);
-  const payoutAmount = Math.round((capitalBefore * Number(percent)) / 100);
-
-  setIsSavingPayout(true);
-
-  try {
-    if (payoutModal.reinvest) {
-      await createReinvest(inv.id, monthKey, payoutAmount);
-    } else {
-      await createTakeProfit(inv.id, monthKey, payoutAmount);
+    if (savingInvestor[inv.id]) {
+      alert("Подождите, данные инвестора сохраняются...");
+      return;
     }
 
-    // обновляем выплаты
-    const fresh = await fetchPayouts();
-    setPayouts(
-      fresh.map((p) => ({
-        ...p,
-        isWithdrawalProfit: !!p.isWithdrawalProfit,
-        isWithdrawalCapital: !!p.isWithdrawalCapital,
-      }))
-    );
+    const percent = percents[inv.id];
+    if (percent === undefined || percent === null || percent === "") {
+      closePayoutModal();
+      return;
+    }
 
-    // ОБНОВЛЯЕМ ИНВЕСТОРОВ
-    const updated = await fetchInvestors();
-    setInvestors(updated);
+    const monthKey = payoutModal.monthKey || currentMonthKey;
 
-    // очищаем %
-    setPercents((prev) => {
-      const c = { ...prev };
-      delete c[inv.id];
-      return c;
-    });
+    const capitalBefore = getCapitalNow(inv);
+    const payoutAmount = Math.round((capitalBefore * Number(percent)) / 100);
 
-    closePayoutModal();
-  } catch (err) {
-    console.error("Ошибка createPayout:", err);
-  } finally {
-    setIsSavingPayout(false);
-  }
-};
+    setIsSavingPayout(true);
 
+    try {
+      if (payoutModal.reinvest) {
+        await createReinvest(inv.id, monthKey, payoutAmount);
+      } else {
+        await createTakeProfit(inv.id, monthKey, payoutAmount);
+      }
 
+      const fresh = await fetchPayouts();
+      setPayouts(
+        fresh.map((p) => ({
+          ...p,
+          isWithdrawalProfit: !!p.isWithdrawalProfit,
+          isWithdrawalCapital: !!p.isWithdrawalCapital,
+        }))
+      );
 
+      const updated = await fetchInvestors();
+      setInvestors(Array.isArray(updated) ? updated : []);
 
-  // === СНЯТИЕ КАПИТАЛА ===
-const handleConfirmWithdraw = async () => {
-  const inv = withdrawModal.investor;
-  if (!inv) return;
+      setPercents((prev) => {
+        const c = { ...prev };
+        delete c[inv.id];
+        return c;
+      });
 
-  const clean = withdrawModal.amount.replace(/\s/g, "").replace(",", ".");
-  const amount = Number(clean);
+      closePayoutModal();
+    } catch (err) {
+      console.error("Ошибка createPayout:", err);
+    } finally {
+      setIsSavingPayout(false);
+    }
+  };
 
-  if (!amount || amount <= 0) {
-    closeWithdrawModal();
-    return;
-  }
+  // ====== СНЯТИЕ КАПИТАЛА ======
+  const handleConfirmWithdraw = async () => {
+    const inv = withdrawModal.investor;
+    if (!inv) return;
 
-  const monthKey = withdrawModal.monthKey || currentMonthKey;
+    const clean = withdrawModal.amount.replace(/\s/g, "").replace(",", ".");
+    const amount = Number(clean);
 
-  setIsSavingWithdraw(true);
+    if (!amount || amount <= 0) {
+      closeWithdrawModal();
+      return;
+    }
 
-  try {
-    // 🔴 Снятие капитала
-    await createCapitalWithdraw(inv.id, monthKey, amount);
+    const monthKey = withdrawModal.monthKey || currentMonthKey;
 
-    const fresh = await fetchPayouts();
+    setIsSavingWithdraw(true);
 
-    setPayouts(
-      fresh.map((p) => ({
-        ...p,
-        isWithdrawalProfit: !!p.isWithdrawalProfit,
-        isWithdrawalCapital: !!p.isWithdrawalCapital,
-      }))
-    );
+    try {
+      await createCapitalWithdraw(inv.id, monthKey, amount);
 
-    closeWithdrawModal();
-  } catch (err) {
-    console.error("Ошибка withdrawal:", err);
-  } finally {
-    setIsSavingWithdraw(false);
-  }
-};
+      const fresh = await fetchPayouts();
+      setPayouts(
+        fresh.map((p) => ({
+          ...p,
+          isWithdrawalProfit: !!p.isWithdrawalProfit,
+          isWithdrawalCapital: !!p.isWithdrawalCapital,
+        }))
+      );
 
+      closeWithdrawModal();
+    } catch (err) {
+      console.error("Ошибка withdrawal:", err);
+    } finally {
+      setIsSavingWithdraw(false);
+    }
+  };
 
-  // Отчёт в WhatsApp
+  // ====== WhatsApp отчёт ======
   const handleShareReport = (inv) => {
     const draft = calcDraftPayout(inv);
     const capitalNow = getCapitalNow(inv);
@@ -520,8 +481,8 @@ const handleConfirmWithdraw = async () => {
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
-  // === РЕНДЕР ===
 
+  // ====== ФИЛЬТРАЦИЯ ======
   const filteredInvestors = useMemo(
     () =>
       investors.filter((inv) =>
@@ -532,6 +493,7 @@ const handleConfirmWithdraw = async () => {
     [investors, search]
   );
 
+  // ====== РЕНДЕР ======
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-6 max-sm:p-2">
       <div className="max-w-full mx-auto space-y-6">
@@ -761,52 +723,50 @@ const handleConfirmWithdraw = async () => {
 
                     {/* ФИО */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
-<input
-  type="text"
-  value={inv.fullName || ""}
-onChange={(e) => {
-  const v = e.target.value;
+                      <input
+                        type="text"
+                        value={inv.fullName || ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
 
-  setInvestors(prev =>
-    prev.map(i => i.id === inv.id ? { ...i, fullName: v } : i)
-  );
+                          setInvestors((prev) =>
+                            prev.map((i) =>
+                              i.id === inv.id ? { ...i, fullName: v } : i
+                            )
+                          );
 
-debouncedUpdateInvestor(inv.id, { fullName: v });
-
-}}
-onBlur={() => updateInvestor(inv.id, { fullName: inv.fullName })}
-
-  className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-  placeholder="Введите ФИО"
-/>
-
+                          debouncedUpdateInvestor(inv.id, { fullName: v });
+                        }}
+                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+                        placeholder="Введите ФИО"
+                      />
                     </td>
 
                     {/* Вложено */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
-<input
-  type="text"
-  inputMode="numeric"
-  value={formatMoneyInput(inv.investedAmount ?? "")}
-onChange={(e) => {
-  const clean = e.target.value.replace(/\s/g, "");
-  const value = Number(clean) || 0;
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formatMoneyInput(inv.investedAmount ?? "")}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/\s/g, "");
+                          const value = Number(clean) || 0;
 
-  setInvestors(prev =>
-    prev.map(i =>
-      i.id === inv.id ? { ...i, investedAmount: value } : i
-    )
-  );
+                          setInvestors((prev) =>
+                            prev.map((i) =>
+                              i.id === inv.id
+                                ? { ...i, investedAmount: value }
+                                : i
+                            )
+                          );
 
-  debouncedUpdateInvestor(inv.id, { investedAmount: value });
-
-}}
-onBlur={() => updateInvestor(inv.id, { investedAmount: inv.investedAmount })}
-
-  className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-  placeholder="0"
-/>
-
+                          debouncedUpdateInvestor(inv.id, {
+                            investedAmount: value,
+                          });
+                        }}
+                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+                        placeholder="0"
+                      />
                     </td>
 
                     {/* Капитал сейчас + снятие капитала */}
@@ -852,18 +812,19 @@ onBlur={() => updateInvestor(inv.id, { investedAmount: inv.investedAmount })}
                     </td>
 
                     {/* % */}
-<td className="py-2 px-4 border-r border-slate-700/50 text-center min-w-[90px]">
-  <input
-    type="text"
-    inputMode="decimal"
-    value={percents[inv.id] ?? ""}
-    onChange={(e) => handlePercentChange(inv.id, e.target.value)}
-    onBlur={() => handlePercentBlur(inv.id)}
-    className="w-full text-center bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-emerald-400"
-    placeholder="0"
-  />
-</td>
-
+                    <td className="py-2 px-4 border-r border-slate-700/50 text-center min-w-[90px]">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={percents[inv.id] ?? ""}
+                        onChange={(e) =>
+                          handlePercentChange(inv.id, e.target.value)
+                        }
+                        onBlur={() => handlePercentBlur(inv.id)}
+                        className="w-full text-center bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-emerald-400"
+                        placeholder="0"
+                      />
+                    </td>
 
                     {/* Выплата (черновик) */}
                     <td className="py-2 px-4 border-r border-slate-700/50 min-w-[130px] font-semibold text-emerald-400">
@@ -1031,20 +992,19 @@ onBlur={() => updateInvestor(inv.id, { investedAmount: inv.investedAmount })}
               >
                 Отмена
               </button>
-<button
-  onClick={handleConfirmDelete}
-  disabled={isDeleting}
-  className={`
-    px-4 py-2 rounded-lg 
-    bg-red-600 hover:bg-red-700 
-    font-semibold shadow-md shadow-red-900/30 
-    transition active:scale-95
-    ${isDeleting ? "opacity-60 cursor-not-allowed" : ""}
-  `}
->
-  {isDeleting ? "Удаляю..." : "Удалить"}
-</button>
-
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className={`
+                  px-4 py-2 rounded-lg 
+                  bg-red-600 hover:bg-red-700 
+                  font-semibold shadow-md shadow-red-900/30 
+                  transition active:scale-95
+                  ${isDeleting ? "opacity-60 cursor-not-allowed" : ""}
+                `}
+              >
+                {isDeleting ? "Удаляю..." : "Удалить"}
+              </button>
             </div>
           </div>
         </div>
