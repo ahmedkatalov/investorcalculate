@@ -771,9 +771,10 @@ onChange={(e) => {
     prev.map(i => i.id === inv.id ? { ...i, fullName: v } : i)
   );
 
-  debouncedUpdateInvestor(inv.id, { fullName: v });
-  updateInvestor(inv.id, { fullName: v }); // мгновенное сохранение
+debouncedUpdateInvestor(inv.id, { fullName: v });
+
 }}
+onBlur={() => updateInvestor(inv.id, { fullName: inv.fullName })}
 
   className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
   placeholder="Введите ФИО"
@@ -798,8 +799,9 @@ onChange={(e) => {
   );
 
   debouncedUpdateInvestor(inv.id, { investedAmount: value });
-  updateInvestor(inv.id, { investedAmount: value }); // мгновенное сохранение
+
 }}
+onBlur={() => updateInvestor(inv.id, { investedAmount: inv.investedAmount })}
 
   className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
   placeholder="0"
