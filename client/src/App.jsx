@@ -8,6 +8,13 @@ import {
   createInvestor,
 } from "./api/api";
 
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 // форматирование денег в поле ввода с пробелами
 const formatMoneyInput = (value) => {
@@ -217,6 +224,11 @@ const handlePercentBlur = (id) => {
 
     updateInvestor(id, { [field]: value });
   };
+
+const debouncedUpdateInvestor = useMemo(
+  () => debounce(updateInvestor, 1500),
+  []
+);
 
   // создать инвестора
   const handleCreateInvestor = async () => {
@@ -731,59 +743,48 @@ const handleConfirmWithdraw = async () => {
 
                     {/* ФИО */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
-                      <input
-                        type="text"
-                        value={inv.fullName || ""}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setInvestors((prev) =>
-                            prev.map((i) =>
-                              i.id === inv.id ? { ...i, fullName: v } : i
-                            )
-                          );
-                        }}
-                        onBlur={(e) =>
-                          handleInvestorFieldBlur(
-                            inv.id,
-                            "fullName",
-                            e.target.value
-                          )
-                        }
-                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-                        placeholder="Введите ФИО"
-                      />
+<input
+  type="text"
+  value={inv.fullName || ""}
+  onChange={(e) => {
+    const fullName = e.target.value;
+
+    setInvestors(prev =>
+      prev.map(i => i.id === inv.id ? { ...i, fullName } : i)
+    );
+
+    // автосохранение через 1.5 сек
+    debouncedUpdateInvestor(inv.id, { fullName });
+  }}
+  className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+  placeholder="Введите ФИО"
+/>
+
                     </td>
 
                     {/* Вложено */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatMoneyInput(inv.investedAmount ?? "")}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/\s/g, "");
-                          setInvestors((prev) =>
-                            prev.map((i) =>
-                              i.id === inv.id
-                                ? {
-                                    ...i,
-                                    investedAmount: Number(raw) || 0,
-                                  }
-                                : i
-                            )
-                          );
-                        }}
-                        onBlur={(e) => {
-                          const clean = e.target.value.replace(/\s/g, "");
-                          handleInvestorFieldBlur(
-                            inv.id,
-                            "investedAmount",
-                            clean
-                          );
-                        }}
-                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-                        placeholder="0"
-                      />
+<input
+  type="text"
+  inputMode="numeric"
+  value={formatMoneyInput(inv.investedAmount ?? "")}
+  onChange={(e) => {
+    const raw = e.target.value.replace(/\s/g, "");
+    const investedAmount = Number(raw) || 0;
+
+    setInvestors(prev =>
+      prev.map(i =>
+        i.id === inv.id ? { ...i, investedAmount } : i
+      )
+    );
+
+    // авто-сохранение через 1.5 сек
+    debouncedUpdateInvestor(inv.id, { investedAmount });
+  }}
+  className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+  placeholder="0"
+/>
+
                     </td>
 
                     {/* Капитал сейчас + снятие капитала */}
