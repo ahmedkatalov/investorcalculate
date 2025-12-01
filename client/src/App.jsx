@@ -31,6 +31,8 @@ const fmt = (v) =>
 const MAX_VISIBLE_MONTH_SLOTS = 4;
 
 export default function App() {
+  const [savingInvestor, setSavingInvestor] = useState({});
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [investors, setInvestors] = useState([]);
@@ -190,27 +192,30 @@ const handlePercentBlur = (id) => {
 
 
   // обновление инвестора
-  const updateInvestor = async (id, updates) => {
-    try {
-      const url =
-        `${import.meta.env.VITE_API_URL || "http://localhost:8080"}` +
-        `/api/investors/${id}`;
+const updateInvestor = async (id, updates) => {
+  setSavingInvestor(prev => ({ ...prev, [id]: true }));
 
-      const body = {};
-      if ("fullName" in updates) {
-        body.full_name = updates.fullName;
-      }
-      if ("investedAmount" in updates) {
-        body.invested_amount = updates.investedAmount;
-      }
+  try {
+    const url =
+      `${import.meta.env.VITE_API_URL}` +
+      `/api/investors/${id}`;
 
-      await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-    } catch {}
-  };
+    const body = {};
+    if (updates.fullName !== undefined) body.full_name = updates.fullName;
+    if (updates.investedAmount !== undefined)
+      body.invested_amount = updates.investedAmount;
+
+    await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  } finally {
+    setSavingInvestor(prev => ({ ...prev, [id]: false }));
+  }
+};
+
 
   const handleInvestorFieldBlur = (id, field, raw) => {
     let value = raw;
@@ -751,16 +756,17 @@ const handleConfirmWithdraw = async () => {
 <input
   type="text"
   value={inv.fullName || ""}
-  onChange={(e) => {
-    const fullName = e.target.value;
+onChange={(e) => {
+  const v = e.target.value;
 
-    setInvestors(prev =>
-      prev.map(i => i.id === inv.id ? { ...i, fullName } : i)
-    );
+  setInvestors(prev =>
+    prev.map(i => i.id === inv.id ? { ...i, fullName: v } : i)
+  );
 
-    // автосохранение через 1.5 сек
-    debouncedUpdateInvestor(inv.id, { fullName });
-  }}
+  debouncedUpdateInvestor(inv.id, { fullName: v });
+  updateInvestor(inv.id, { fullName: v }); // мгновенное сохранение
+}}
+
   className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
   placeholder="Введите ФИО"
 />
@@ -773,19 +779,20 @@ const handleConfirmWithdraw = async () => {
   type="text"
   inputMode="numeric"
   value={formatMoneyInput(inv.investedAmount ?? "")}
-  onChange={(e) => {
-    const raw = e.target.value.replace(/\s/g, "");
-    const investedAmount = Number(raw) || 0;
+onChange={(e) => {
+  const clean = e.target.value.replace(/\s/g, "");
+  const value = Number(clean) || 0;
 
-    setInvestors(prev =>
-      prev.map(i =>
-        i.id === inv.id ? { ...i, investedAmount } : i
-      )
-    );
+  setInvestors(prev =>
+    prev.map(i =>
+      i.id === inv.id ? { ...i, investedAmount: value } : i
+    )
+  );
 
-    // авто-сохранение через 1.5 сек
-    debouncedUpdateInvestor(inv.id, { investedAmount });
-  }}
+  debouncedUpdateInvestor(inv.id, { investedAmount: value });
+  updateInvestor(inv.id, { investedAmount: value }); // мгновенное сохранение
+}}
+
   className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
   placeholder="0"
 />
