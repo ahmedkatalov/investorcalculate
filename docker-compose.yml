@@ -41,7 +41,7 @@ services:
       context: ./client
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: "/app"   # 🔥 Исправлено — без /api
+        VITE_API_URL: "/api"   # 🔥 Исправлено — без /api
     restart: unless-stopped
     container_name: invest_frontend
     depends_on:
