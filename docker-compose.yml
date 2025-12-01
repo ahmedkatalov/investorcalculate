@@ -18,6 +18,7 @@ services:
   backend:
     build:
       context: ./server
+      dockerfile: Dockerfile
     restart: unless-stopped
     container_name: invest_backend
     depends_on:
@@ -32,22 +33,21 @@ services:
       CORS_ORIGIN: "*"
       SECRET_REG_CODE: "BM887700"
       JWT_SECRET: "jwt_secret_key_123"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "/api"
+    restart: unless-stopped
+    container_name: invest_frontend
+    depends_on:
+      - backend
     expose:
-      - "8080"
-
-frontend:
-  build:
-    context: ./client
-    dockerfile: Dockerfile
-    args:
-      VITE_API_URL: "/api"
-  restart: unless-stopped
-  container_name: invest_frontend
-  depends_on:
-    - backend
-  expose:
-    - "80"
-
+      - "80"
 
   caddy:
     image: caddy:latest
@@ -62,7 +62,6 @@ frontend:
       - caddy_config:/config
     depends_on:
       - frontend
-      - backend
 
 volumes:
   pgdata:
