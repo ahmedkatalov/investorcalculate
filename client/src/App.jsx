@@ -80,23 +80,32 @@ export default function App() {
   }, [currentMonthKey]);
 
   // ====== загрузка данных ======
-  useEffect(() => {
-    fetchInvestors().then((data) => {
-      setInvestors(Array.isArray(data) ? data : []);
-    });
+useEffect(() => {
+  fetchInvestors().then((data) => {
+    if (!Array.isArray(data)) return setInvestors([]);
 
-    fetchPayouts().then((data) => {
-      setPayouts(
-        Array.isArray(data)
-          ? data.map((p) => ({
-              ...p,
-              isWithdrawalProfit: !!p.isWithdrawalProfit,
-              isWithdrawalCapital: !!p.isWithdrawalCapital,
-            }))
-          : []
-      );
-    });
-  }, []);
+    // Добавляем сырое значение для поля ввода
+    const withRaw = data.map(inv => ({
+      ...inv,
+      _rawInvested: formatMoneyInput(inv.investedAmount || 0)
+    }));
+
+    setInvestors(withRaw);
+  });
+
+  fetchPayouts().then((data) => {
+    setPayouts(
+      Array.isArray(data)
+        ? data.map((p) => ({
+            ...p,
+            isWithdrawalProfit: !!p.isWithdrawalProfit,
+            isWithdrawalCapital: !!p.isWithdrawalCapital,
+          }))
+        : []
+    );
+  });
+}, []);
+
 
   // ====== расчёты ======
 
