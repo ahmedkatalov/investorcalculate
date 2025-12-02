@@ -755,31 +755,44 @@ const deleteInvestorApi = async (id) => {
                     </td>
 
                     {/* Вложено */}
-                    <td className="py-2 px-4 border-r border-slate-700/50">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatMoneyInput(inv.investedAmount ?? "")}
-                        onChange={(e) => {
-                          const clean = e.target.value.replace(/\s/g, "");
-                          const value = Number(clean) || 0;
+<td className="py-2 px-4 border-r border-slate-700/50">
+  <input
+    type="text"
+    inputMode="numeric"
+    value={inv._rawInvested ?? ""}
+    onChange={(e) => {
+      // Разрешаем свободный ввод
+      const raw = e.target.value.replace(/[^\d\s]/g, "");
+      
+      setInvestors(prev =>
+        prev.map(i =>
+          i.id === inv.id
+            ? { ...i, _rawInvested: raw } // сохраняем сырое значение
+            : i
+        )
+      );
+    }}
+    onBlur={(e) => {
+      const clean = (inv._rawInvested ?? "").replace(/\s/g, "");
+      const number = Number(clean) || 0;
 
-                          setInvestors((prev) =>
-                            prev.map((i) =>
-                              i.id === inv.id
-                                ? { ...i, investedAmount: value }
-                                : i
-                            )
-                          );
+      // Обновляем в стейте
+      setInvestors(prev =>
+        prev.map(i =>
+          i.id === inv.id
+            ? { ...i, investedAmount: number, _rawInvested: formatMoneyInput(number) }
+            : i
+        )
+      );
 
-                          debouncedUpdateInvestor(inv.id, {
-                            investedAmount: value,
-                          });
-                        }}
-                        className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
-                        placeholder="0"
-                      />
-                    </td>
+      // Авто-сохранение только на Blur
+      updateInvestor(inv.id, { investedAmount: number });
+    }}
+    className="w-full bg-transparent px-2 py-1 rounded-lg outline-none border border-transparent hover:border-slate-500/50 focus:ring-2 focus:ring-blue-400"
+    placeholder="0"
+  />
+</td>
+
 
                     {/* Капитал сейчас + снятие капитала */}
                     <td className="py-2 px-4 border-r border-slate-700/50">
