@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_URL } from "./api/api";
+import ExcelExporter from "./components/ExcelExporter";
 
 import {
   fetchInvestors,
@@ -518,6 +519,13 @@ const deleteInvestorApi = async (id) => {
               "
             />
           </div>
+  <ExcelExporter
+    investors={investors}
+    payouts={payouts}
+    getCapitalNow={getCapitalNow}
+    getCurrentNetProfit={getCurrentNetProfit}
+    getTotalProfitAllTime={getTotalProfitAllTime}
+  />
 
           <button
             onClick={handleCreateInvestor}
