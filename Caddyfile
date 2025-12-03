@@ -1,7 +1,12 @@
-investorcalculate2.online {
-    reverse_proxy invest_frontend:80
-}
+:80 {
+    encode gzip
 
-investorcalculate2.online/api/* {
-    reverse_proxy invest_backend:8080
+    root * /usr/share/nginx/html
+    file_server
+
+    handle_path /api/* {
+        reverse_proxy backend:8080
+    }
+
+    try_files {path} /index.html
 }
