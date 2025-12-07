@@ -59,7 +59,10 @@ export async function fetchInvestors() {
 
   const data = await res.json();
 
-  return data.map((i) => ({
+  // ✅ Гарантия, что никогда не будет null
+  const safe = Array.isArray(data) ? data : [];
+
+  return safe.map((i) => ({
     id: i.id,
     fullName: i.full_name,
     investedAmount: Number(i.invested_amount),
@@ -96,14 +99,18 @@ export async function fetchPayouts() {
   const res = await fetch(`${API_URL}/payouts`, {
     headers: authHeaders(),
   });
+
   if (!res.ok) return [];
 
   const data = await res.json();
 
-  return data.map((p) => ({
+  // ✅ Если backend вернул null → заменяем пустым массивом
+  const safe = Array.isArray(data) ? data : [];
+
+  return safe.map((p) => ({
     id: p.id,
     investorId: p.investor_id,
-    periodMonth: p.period_month.slice(0, 7),
+    periodMonth: p.period_month?.slice(0, 7) || null,
     payoutAmount: Number(p.payout_amount),
     reinvest: p.reinvest,
     isWithdrawalProfit: p.is_withdrawal_profit,
