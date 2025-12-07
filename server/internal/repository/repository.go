@@ -166,7 +166,7 @@ func (r *Repository) CreateUser(ctx context.Context, u *models.User) error {
     return r.db.QueryRowContext(ctx,
         `INSERT INTO users (email, password_hash)
          VALUES ($1, $2)
-         RETURNING id, email, password_hash, created_at`,
+         RETURNING id, created_at`,
         u.Email, u.PasswordHash,
-    ).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
+    ).Scan(&u.ID, &u.CreatedAt)
 }

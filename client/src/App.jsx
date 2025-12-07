@@ -7,6 +7,7 @@ import DeleteInvestorModal from "./components/modals/DeleteInvestorModal";
 import PayoutModal from "./components/modals/PayoutModal";
 import WithdrawCapitalModal from "./components/modals/WithdrawCapitalModal";
 import ShareModal from "./components/modals/ShareModal";
+import AuthModal from "./AuthModal";
 
 // ===== ДЕБОУНС =====
 function debounce(fn, delay) {
@@ -17,7 +18,31 @@ function debounce(fn, delay) {
   };
 }
 
+// ========= КОРНЕВОЙ КОМПОНЕНТ: АВТОРИЗАЦИЯ =========
 export default function App() {
+  const [token, setToken] = useState(localStorage.getItem("token"));
+
+  const handleAuthenticated = (newToken) => {
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+  };
+
+  // если нет токена — показываем окно авторизации
+  if (!token) {
+    return <AuthModal onAuthenticated={handleAuthenticated} />;
+  }
+
+  // если токен есть — рендерим основное приложение
+  return <MainApp logout={logout} />;
+}
+
+// ========= ОСНОВНОЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ =========
+function MainApp({ logout }) {
   const {
     investors,
     payouts,
@@ -95,7 +120,7 @@ export default function App() {
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    // 📱 На телефоне — система Share API
+    // 📱 На телефоне — системный Share API
     if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       await navigator.share({
         title: "Отчёт по инвестору",
@@ -131,14 +156,16 @@ export default function App() {
   }
 
   // ===== Кнопка WhatsApp (ПК) =====
-function handleWhatsappSend() {
-  handleDownloadPdf();
+  function handleWhatsappSend() {
+    handleDownloadPdf();
 
-  // открываем промежуточную страницу с deep-link
-  window.open(`/open-whatsapp.html?msg=${encodeURIComponent(
-    `Отчёт по инвестору ${shareModal.investor.fullName} готов`
-  )}`, "_blank");
-}
+    window.open(
+      `/open-whatsapp.html?msg=${encodeURIComponent(
+        `Отчёт по инвестору ${shareModal.investor.fullName} готов`
+      )}`,
+      "_blank"
+    );
+  }
 
   // ===== Кнопка Share API в модалке =====
   async function handleShareAPI() {
@@ -209,7 +236,12 @@ function handleWhatsappSend() {
 
     setPayoutModal((p) => ({ ...p, isSaving: true }));
 
-    await savePayout({ investorId: investor.id, month: monthKey, amount, reinvest });
+    await savePayout({
+      investorId: investor.id,
+      month: monthKey,
+      amount,
+      reinvest,
+    });
 
     setPercents((p) => {
       const copy = { ...p };
@@ -280,6 +312,7 @@ function handleWhatsappSend() {
         getCapitalNow={getCapitalNow}
         getCurrentNetProfit={getCurrentNetProfit}
         getTotalProfitAllTime={getTotalProfitAllTime}
+        logout={logout} // 👈 важная пропса для кнопки "Выйти"
       />
 
       <DeleteInvestorModal

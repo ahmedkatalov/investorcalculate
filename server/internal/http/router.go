@@ -23,36 +23,27 @@ func NewServer(repo *repository.Repository, cfg *config.Config) *Server {
 	}
 }
 
-
 func (s *Server) Routes() http.Handler {
-	mux := http.NewServeMux()
+    mux := http.NewServeMux()
 
-	// ==========================
-	// Investors
-	// ==========================
-	mux.HandleFunc("/api/investors", s.handleInvestors)       // GET + POST
-	mux.HandleFunc("/api/investors/", s.handleInvestorByID)   // PUT + DELETE
+    // ===== Investors (protected)
+    mux.HandleFunc("/api/investors", s.withAuth(s.handleInvestors))
+    mux.HandleFunc("/api/investors/", s.withAuth(s.handleInvestorByID))
 
-	// ==========================
-	// Payouts
-	// ==========================
-	mux.HandleFunc("/api/payouts", s.handlePayouts)    
-		// Auth
+    // ===== Payouts (protected)
+    mux.HandleFunc("/api/payouts", s.withAuth(s.handlePayouts))
 
-	mux.HandleFunc("/api/login", s.handleLogin)
-	mux.HandleFunc("/api/register", s.handleRegister)
+    // ===== Auth (public)
+    mux.HandleFunc("/api/login", s.handleLogin)
+    mux.HandleFunc("/api/register", s.handleRegister)
 
-       // GET + POST
+    // CORS
+    c := cors.New(cors.Options{
+        AllowedOrigins:   []string{"*"},
+        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowedHeaders:   []string{"*"},
+        AllowCredentials: true,
+    })
 
-	// ==========================
-	// CORS
-	// ==========================
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"}, 
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
-	})
-
-	return c.Handler(mux)
+    return c.Handler(mux)
 }

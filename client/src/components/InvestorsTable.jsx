@@ -10,20 +10,19 @@ export default function InvestorsTable({
   percents,
   setPercents,
   getWithdrawnCapitalTotal,
-
   onAddInvestor,
   onUpdateInvestor,
   onOpenPayout,
   onOpenWithdraw,
   onOpenDelete,
-
-    onShareReport,   
-
+  onShareReport,
   getCapitalNow,
   getCurrentNetProfit,
   getTotalProfitAllTime,
+  logout, // 🔥 Новая пропса выхода
 }) {
   const [search, setSearch] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false); // 🔥 мобильное бургер-меню
 
   // === фильтрация по ФИО ===
   const filteredInvestors = useMemo(
@@ -55,10 +54,9 @@ export default function InvestorsTable({
       invMap.set(p.investorId, list);
     });
 
-    // 🔥 УДАЛЯЕМ ПУСТЫЕ МЕСЯЦЫ
+    // Убираем пустые месяцы
     const months = Array.from(byMonthInv.entries())
       .filter(([month, invMap]) => {
-        // Проверяем, есть ли хоть одна выплата у любого инвестора
         for (const list of invMap.values()) {
           if (list.length > 0) return true;
         }
@@ -85,7 +83,6 @@ export default function InvestorsTable({
     return { monthSlots: slots, payoutsByMonthInv: byMonthInv };
   }, [payouts]);
 
-  // авто-корректировка offset
   useEffect(() => {
     setMonthOffset((prev) => {
       if (monthSlots.length === 0) return 0;
@@ -119,45 +116,110 @@ export default function InvestorsTable({
 
   return (
     <div className="space-y-6">
-      {/* Заголовок */}
-      <div className="flex items-center justify-between gap-3">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по ФИО..."
-          className="
-            max-w-[400px] px-3 py-2
-            rounded-xl bg-slate-800 text-slate-100
-            border border-slate-700
-            focus:ring-2 focus:ring-blue-500
-            outline-none
-          "
-        />
 
-        <ExcelExporter
-          investors={investors}
-          payouts={payouts}
-          getCapitalNow={getCapitalNow}
-          getCurrentNetProfit={getCurrentNetProfit}
-          getTotalProfitAllTime={getTotalProfitAllTime}
-        />
+      {/* 🔵 АДАПТИВНАЯ ШАПКА С БУРГЕРОМ */}
+      <div className="w-full">
 
-        <button
-          onClick={onAddInvestor}
-          className="
-            px-4 py-2 text-sm
-            border border-slate-300/50 
-            rounded-xl text-slate-100 
-            hover:bg-slate-700/50 transition
-            backdrop-blur-sm
-          "
-        >
-          + Добавить ячейку ({investors.length})
-        </button>
+        {/* Верхняя строка */}
+        <div className="flex items-center justify-between gap-3 p-2">
+
+          {/* Поиск */}
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск..."
+            className="
+              flex-1 sm:flex-none sm:w-[300px]
+              px-3 py-2 rounded-xl bg-slate-800 text-slate-100
+              border border-slate-700 outline-none
+              focus:ring-2 focus:ring-blue-500
+              transition
+            "
+          />
+
+          {/* ПК Кнопки */}
+          <div className="hidden sm:flex items-center gap-2">
+            <ExcelExporter
+              investors={investors}
+              payouts={payouts}
+              getCapitalNow={getCapitalNow}
+              getCurrentNetProfit={getCurrentNetProfit}
+              getTotalProfitAllTime={getTotalProfitAllTime}
+            />
+
+            <button
+              onClick={onAddInvestor}
+              className="
+                px-4 py-2 text-sm border border-slate-600 rounded-xl text-slate-100 
+                hover:bg-slate-700 transition
+              "
+            >
+              + Добавить ({investors.length})
+            </button>
+
+            <button
+              onClick={logout}
+              className="
+                px-4 py-2 text-sm rounded-xl
+                bg-red-600 text-white hover:bg-red-500 transition
+              "
+            >
+              Выйти
+            </button>
+          </div>
+
+          {/* Бургер */}
+          <button
+            className="sm:hidden block text-slate-200 text-3xl px-2"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
+        </div>
+
+        {/* Мобильное меню */}
+        {menuOpen && (
+          <div
+            className="
+              sm:hidden flex flex-col gap-2 p-2 mt-1
+              bg-slate-800 border border-slate-700 rounded-xl
+              animate-fadeDown
+            "
+          >
+            <ExcelExporter
+              investors={investors}
+              payouts={payouts}
+              getCapitalNow={getCapitalNow}
+              getCurrentNetProfit={getCurrentNetProfit}
+              getTotalProfitAllTime={getTotalProfitAllTime}
+            />
+
+            <button
+              onClick={onAddInvestor}
+              className="
+                w-full px-4 py-2 text-sm
+                border border-slate-600 rounded-xl text-slate-100
+                hover:bg-slate-700 transition
+              "
+            >
+              + Добавить инвестора
+            </button>
+
+            <button
+              onClick={logout}
+              className="
+                w-full px-4 py-2 text-sm rounded-xl
+                bg-red-600 text-white hover:bg-red-500 transition
+              "
+            >
+              Выйти
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Таблица */}
+      {/* 🔵 ОСНОВНАЯ ТАБЛИЦА */}
       <div
         className="
           bg-slate-800 rounded-xl 
@@ -198,11 +260,10 @@ export default function InvestorsTable({
                 Действия
               </th>
 
-              {/* КОЛОНКИ МЕСЯЦЕВ */}
+              {/* Месяцы */}
               {visibleMonthSlots.map((slot, idx) => {
                 const [y, m] = slot.month.split("-");
                 const labelDate = new Date(Number(y), Number(m) - 1, 1);
-
                 const label = labelDate.toLocaleDateString("ru-RU", {
                   month: "short",
                   year: "2-digit",
@@ -246,23 +307,20 @@ export default function InvestorsTable({
                 );
               })}
 
-       
+              {/* Чистая прибыль */}
+              <th className="sticky top-0 z-40 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700">
+                Чистая прибыль
+              </th>
 
-{/* Чистая прибыль */}
-<th className="sticky top-0 z-40 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700">
-  Чистая прибыль
-</th>
+              {/* Прибыль за всё время */}
+              <th className="sticky top-0 z-40 py-3 px-4 min-w-[170px] border-r border-slate-600 bg-slate-700">
+                Прибыль за всё время
+              </th>
 
-{/* Прибыль за всё время */}
-<th className="sticky top-0 z-40 py-3 px-4 min-w-[170px] border-r border-slate-600 bg-slate-700">
-  Прибыль за всё время
-</th>
-
-{/* Всего снято */}
-<th className="sticky top-0 z-40 py-3 px-4 min-w-[150px] bg-slate-700">
-  Всего снято
-</th>
-
+              {/* Всего снято */}
+              <th className="sticky top-0 z-40 py-3 px-4 min-w-[150px] bg-slate-700">
+                Всего снято
+              </th>
             </tr>
           </thead>
 
@@ -286,13 +344,23 @@ export default function InvestorsTable({
                 onOpenDelete={onOpenDelete}
                 visibleMonthSlots={visibleMonthSlots}
                 payoutsByMonthInv={payoutsByMonthInv}
-
-                onShareReport={onShareReport} 
+                onShareReport={onShareReport}
               />
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Анимация */}
+      <style>{`
+        @keyframes fadeDown {
+          from { opacity: 0; transform: translateY(-5px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeDown {
+          animation: fadeDown 0.15s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
