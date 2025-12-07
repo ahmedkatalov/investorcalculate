@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Открытие WhatsApp…</title>
+  <style>
+    body {
+      background: #0f172a;
+      color: white;
+      font-family: Arial;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    button {
+      font-size: 18px;
+      padding: 14px 26px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: #22c55e;
+      color: white;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Открыть WhatsApp на вашем Mac?</h2>
+
+  <button id="open">Открыть WhatsApp</button>
+
+  <script>
+    document.getElementById("open").onclick = () => {
+      window.location.href = "whatsapp://";
+    };
+  </script>
+</body>
+</html>
