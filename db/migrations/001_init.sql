@@ -24,11 +24,3 @@ ADD COLUMN is_withdrawal_profit BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE payouts
 ADD COLUMN is_withdrawal_capital BOOLEAN NOT NULL DEFAULT FALSE;
 
--- старый is_withdrawal можешь оставить или удалить позже
-
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
