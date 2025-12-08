@@ -15,6 +15,8 @@ export function useInvestData() {
   const [payouts, setPayouts] = useState([]);
   const [percents, setPercents] = useState({});
 
+
+
   // =============================
   //   ЗАГРУЗКА ИНВЕСТОРОВ + ВЫПЛАТ
   // =============================
@@ -157,6 +159,17 @@ async function deleteInvestor(id) {
   return true;
 }
 
+function updatePayouts(newPayouts) {
+  setPayouts(
+    newPayouts.map((p) => ({
+      ...p,
+      isWithdrawalProfit: !!p.isWithdrawalProfit,
+      isWithdrawalCapital: !!p.isWithdrawalCapital,
+      isTopup: !!p.isTopup,
+    }))
+  );
+}
+
 
   // =============================
   //  СНЯТИЕ КАПИТАЛА
@@ -187,6 +200,8 @@ return {
   getCurrentNetProfit,
   getTotalProfitAllTime,
   getWithdrawnCapitalTotal,
+
+  updatePayouts,
 };
 
 }

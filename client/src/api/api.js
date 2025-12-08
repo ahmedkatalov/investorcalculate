@@ -95,6 +95,8 @@ export async function createInvestor(fullName, investedAmount) {
 // PAYOUTS
 //
 
+
+
 export async function fetchPayouts() {
   const res = await fetch(`${API_URL}/payouts`, {
     headers: authHeaders(),
@@ -160,6 +162,25 @@ export async function createTakeProfit(investorId, periodMonth, amount) {
 
   return data;
 }
+
+// ► ПОПОЛНЕНИЕ КАПИТАЛА (ДОБАВИТЬ ДЕНЬГИ)
+export async function createTopup(investorId, periodMonth, amount) {
+  const res = await fetch(`${API_URL}/payouts/topup`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      investorId,
+      periodMonth,
+      amount,
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to top up");
+
+  return data;
+}
+
 
 // ► Снял капитал
 export async function createCapitalWithdraw(investorId, periodMonth, amount) {

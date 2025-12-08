@@ -16,15 +16,17 @@ export default function InvestorsTable({
   onOpenWithdraw,
   onOpenDelete,
   onShareReport,
+  onOpenTopup,            // ✅ ДОБАВЛЕНО
+  onOpenTopupHistory,     // ✅ ДОБАВЛЕНО
   getCapitalNow,
   getCurrentNetProfit,
   getTotalProfitAllTime,
-  logout, // 🔥 Новая пропса выхода
+  logout,
 }) {
   const [search, setSearch] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false); // 🔥 мобильное бургер-меню
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // === фильтрация по ФИО ===
+  // === фильтрация ===
   const filteredInvestors = useMemo(
     () =>
       investors.filter((inv) =>
@@ -43,7 +45,6 @@ export default function InvestorsTable({
 
     payouts.forEach((p) => {
       if (!p.periodMonth) return;
-
       if (!byMonthInv.has(p.periodMonth)) {
         byMonthInv.set(p.periodMonth, new Map());
       }
@@ -54,9 +55,8 @@ export default function InvestorsTable({
       invMap.set(p.investorId, list);
     });
 
-    // Убираем пустые месяцы
     const months = Array.from(byMonthInv.entries())
-      .filter(([month, invMap]) => {
+      .filter(([_, invMap]) => {
         for (const list of invMap.values()) {
           if (list.length > 0) return true;
         }
@@ -115,15 +115,10 @@ export default function InvestorsTable({
   };
 
   return (
-    <div className="space-y-6">
-
-      {/* 🔵 АДАПТИВНАЯ ШАПКА С БУРГЕРОМ */}
+    <div className="space-y-2">
+      {/* ================= ШАПКА ================= */}
       <div className="w-full">
-
-        {/* Верхняя строка */}
         <div className="flex items-center justify-between gap-3 p-2">
-
-          {/* Поиск */}
           <input
             type="text"
             value={search}
@@ -134,11 +129,9 @@ export default function InvestorsTable({
               px-3 py-2 rounded-xl bg-slate-800 text-slate-100
               border border-slate-700 outline-none
               focus:ring-2 focus:ring-blue-500
-              transition
             "
           />
 
-          {/* ПК Кнопки */}
           <div className="hidden sm:flex items-center gap-2">
             <ExcelExporter
               investors={investors}
@@ -169,7 +162,6 @@ export default function InvestorsTable({
             </button>
           </div>
 
-          {/* Бургер */}
           <button
             className="sm:hidden block text-slate-200 text-3xl px-2"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -178,7 +170,6 @@ export default function InvestorsTable({
           </button>
         </div>
 
-        {/* Мобильное меню */}
         {menuOpen && (
           <div
             className="
@@ -197,21 +188,14 @@ export default function InvestorsTable({
 
             <button
               onClick={onAddInvestor}
-              className="
-                w-full px-4 py-2 text-sm
-                border border-slate-600 rounded-xl text-slate-100
-                hover:bg-slate-700 transition
-              "
+              className="w-full px-4 py-2 text-sm border border-slate-600 rounded-xl text-slate-100 hover:bg-slate-700"
             >
               + Добавить инвестора
             </button>
 
             <button
               onClick={logout}
-              className="
-                w-full px-4 py-2 text-sm rounded-xl
-                bg-red-600 text-white hover:bg-red-500 transition
-              "
+              className="w-full px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-500"
             >
               Выйти
             </button>
@@ -219,14 +203,11 @@ export default function InvestorsTable({
         )}
       </div>
 
-      {/* 🔵 ОСНОВНАЯ ТАБЛИЦА */}
+      {/* ================= ТАБЛИЦА ================= */}
       <div
         className="
-          bg-slate-800 rounded-xl 
-          shadow-xl shadow-black/20 
-          border border-slate-700/60
-          h-[calc(100vh-180px)]
-          overflow-y-auto
+          bg-slate-800 rounded-xl shadow-xl shadow-black/20 
+          border border-slate-700/60 h-[calc(100vh-110px)] overflow-y-auto
         "
       >
         <table className="w-full text-sm border-collapse select-none">
@@ -236,27 +217,27 @@ export default function InvestorsTable({
                 №
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[240px] border-r border-slate-600 bg-slate-700 text-left">
+              <th className="sticky top-0 py-3 px-4 min-w-[240px] border-r border-slate-600 bg-slate-700 text-left">
                 ФИО
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[120px] border-r border-slate-600 bg-slate-700 text-left">
+              <th className="sticky top-0 py-3 px-4 min-w-[120px] border-r border-slate-600 bg-slate-700">
                 Вложено
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[160px] border-r border-slate-600 bg-slate-700 text-left">
+              <th className="sticky top-0 py-3 px-4 min-w-[160px] border-r border-slate-600 bg-slate-700">
                 Капитал сейчас
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[90px] border-r border-slate-600 bg-slate-700 text-center">
+              <th className="sticky top-0 py-3 px-4 min-w-[90px] border-r border-slate-600 bg-slate-700 text-center">
                 %
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[130px] border-r border-slate-600 bg-slate-700 text-left">
+              <th className="sticky top-0 py-3 px-4 min-w-[130px] border-r border-slate-600 bg-slate-700">
                 Выплата (черновик)
               </th>
 
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700 text-center">
+              <th className="sticky top-0 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700 text-center">
                 Действия
               </th>
 
@@ -274,15 +255,10 @@ export default function InvestorsTable({
 
                 return (
                   <th
-                    key={`${slot.month}-${slot.index}-${idx}`}
-                    className="
-                      sticky top-0 z-30
-                      py-2 px-2 min-w-[95px]
-                      border-r border-slate-600
-                      bg-slate-700 whitespace-nowrap
-                    "
+                    key={`${slot.month}-${slot.index}`}
+                    className="sticky top-0 py-2 px-2 min-w-[95px] border-r border-slate-600 bg-slate-700 text-xs whitespace-nowrap"
                   >
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between">
                       {isFirst && hasPrevMonths && (
                         <button
                           onClick={handlePrevMonths}
@@ -307,23 +283,21 @@ export default function InvestorsTable({
                 );
               })}
 
-              {/* Чистая прибыль */}
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700">
+              <th className="sticky top-0 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700">
                 Чистая прибыль
               </th>
 
-              {/* Прибыль за всё время */}
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[170px] border-r border-slate-600 bg-slate-700">
+              <th className="sticky top-0 py-3 px-4 min-w-[170px] border-r border-slate-600 bg-slate-700">
                 Прибыль за всё время
               </th>
 
-              {/* Всего снято */}
-              <th className="sticky top-0 z-40 py-3 px-4 min-w-[150px] bg-slate-700">
+              <th className="sticky top-0 py-3 px-4 min-w-[150px] bg-slate-700">
                 Всего снято
               </th>
             </tr>
           </thead>
 
+          {/* 🟦 СТРОКИ */}
           <tbody>
             {filteredInvestors.map((inv, index) => (
               <InvestorRow
@@ -342,9 +316,15 @@ export default function InvestorsTable({
                 onOpenPayout={onOpenPayout}
                 onOpenWithdraw={onOpenWithdraw}
                 onOpenDelete={onOpenDelete}
+                onShareReport={onShareReport}
+
+                onOpenTopup={onOpenTopup}               // ✅ ДОБАВЛЕНО
+                onOpenTopupHistory={onOpenTopupHistory} // ✅ ДОБАВЛЕНО
+
+
+
                 visibleMonthSlots={visibleMonthSlots}
                 payoutsByMonthInv={payoutsByMonthInv}
-                onShareReport={onShareReport}
               />
             ))}
           </tbody>

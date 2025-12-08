@@ -1,25 +1,9 @@
-import { useState, useMemo } from "react";
-import { useInvestData } from "./hooks/useInvestData";
-import { generateInvestorPdfBlob } from "./utils/investorPdfReport";
+// App.jsx
 
-import InvestorsTable from "./components/InvestorsTable";
-import DeleteInvestorModal from "./components/modals/DeleteInvestorModal";
-import PayoutModal from "./components/modals/PayoutModal";
-import WithdrawCapitalModal from "./components/modals/WithdrawCapitalModal";
-import ShareModal from "./components/modals/ShareModal";
 import AuthModal from "./AuthModal";
 
-// ===== ДЕБОУНС =====
-function debounce(fn, delay) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
 
-// ========= КОРНЕВОЙ КОМПОНЕНТ: АВТОРИЗАЦИЯ =========
-export default function App() {
+export  function App() {
   const [token, setToken] = useState(localStorage.getItem("token"));
 
   const handleAuthenticated = (newToken) => {
@@ -32,20 +16,43 @@ export default function App() {
     setToken(null);
   };
 
-  // если нет токена — показываем окно авторизации
   if (!token) {
     return <AuthModal onAuthenticated={handleAuthenticated} />;
   }
 
-  // если токен есть — рендерим основное приложение
   return <MainApp logout={logout} />;
 }
+// MainApp.jsx
+import { useState, useMemo } from "react";
+import { useInvestData } from "./hooks/useInvestData";
+import { generateInvestorPdfBlob } from "./utils/investorPdfReport";
+import {
+  createTopup,
+  fetchPayouts
+} from "./api/api";
 
-// ========= ОСНОВНОЙ КОМПОНЕНТ ПРИЛОЖЕНИЯ =========
-function MainApp({ logout }) {
+import InvestorsTable from "./components/InvestorsTable";
+import DeleteInvestorModal from "./components/modals/DeleteInvestorModal";
+import PayoutModal from "./components/modals/PayoutModal";
+import WithdrawCapitalModal from "./components/modals/WithdrawCapitalModal";
+import ShareModal from "./components/modals/ShareModal";
+import TopupModal from "./components/modals/TopupModal";  // 🔥 ТВОЙ ГОТОВЫЙ МОДАЛ
+import TopupHistoryModal from "./components/modals/TopupHistoryModal";
+
+// ===== ДЕБОУНС =====
+function debounce(fn, delay) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+export default function MainApp({ logout }) {
   const {
     investors,
     payouts,
+    setPayouts,
     percents,
     setPercents,
     addInvestor,
@@ -58,6 +65,12 @@ function MainApp({ logout }) {
     getTotalProfitAllTime,
     getWithdrawnCapitalTotal,
   } = useInvestData();
+
+  // ====== текущий месяц ======
+  const currentMonthKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
 
   const debouncedUpdateInvestor = useMemo(
     () => debounce(updateInvestor, 2000),
@@ -87,21 +100,77 @@ function MainApp({ logout }) {
     isSaving: false,
   });
 
-  // ===== SHARE MODAL (ONLY PC) =====
+  // 🔥 ПОПОЛНЕНИЕ КАПИТАЛА
+  const [topupModal, setTopupModal] = useState({
+    open: false,
+    investor: null,
+    monthKey: currentMonthKey,
+    amount: "",
+    isSaving: false,
+  });
+  const [topupHistoryModal, setTopupHistoryModal] = useState({
+  open: false,
+  investor: null,
+});
+
+function openTopupHistoryModal(inv) {
+  setTopupHistoryModal({
+    open: true,
+    investor: inv
+  });
+}
+
+
+  const openTopupModal = (inv) =>
+    setTopupModal({
+      open: true,
+      investor: inv,
+      monthKey: currentMonthKey,
+      amount: "",
+      isSaving: false,
+    });
+
+  const closeTopupModal = () =>
+    setTopupModal({
+      open: false,
+      investor: null,
+      monthKey: "",
+      amount: "",
+      isSaving: false,
+    });
+async function confirmTopup() {
+  const inv = topupModal.investor;
+  if (!inv) return;
+
+  const clean = topupModal.amount.replace(/\s/g, "");
+  const amount = Number(clean);
+  if (!amount || amount <= 0) return;
+
+  setTopupModal((p) => ({ ...p, isSaving: true }));
+
+  try {
+    await createTopup(inv.id, topupModal.monthKey, amount);
+
+    // 💥 Правильный способ обновить payouts
+    const fresh = await fetchPayouts();
+    // и теперь обновляем через setPayouts из useInvestData
+    
+    // Но setPayouts тебе нужно подключить!
+    updatePayouts(fresh);
+
+    closeTopupModal();
+  } catch (err) {
+    console.error("Ошибка пополнения:", err);
+  }
+}
+
+  // ===== SHARE MODAL =====
   const [shareModal, setShareModal] = useState({
     open: false,
     investor: null,
     pdfBlob: null,
   });
 
-  const currentMonthKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
-
-  // =======================
-  //       SHARE REPORT
-  // =======================
   async function handleShareReport(inv) {
     if (!inv) return;
 
@@ -114,23 +183,21 @@ function MainApp({ logout }) {
       withdrawnTotal: getWithdrawnCapitalTotal(inv.id),
     });
 
+    // mobile → Share API
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const pdfFile = new File([pdfBlob], `Отчёт_${inv.fullName}.pdf`, {
       type: "application/pdf",
     });
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    // 📱 На телефоне — системный Share API
     if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       await navigator.share({
         title: "Отчёт по инвестору",
-        text: `PDF-отчёт по инвестору ${inv.fullName}`,
         files: [pdfFile],
       });
       return;
     }
 
-    // 💻 ПК → Открываем модалку
+    // PC → modal
     setShareModal({
       open: true,
       investor: inv,
@@ -138,27 +205,17 @@ function MainApp({ logout }) {
     });
   }
 
-  function closeShareModal() {
-    setShareModal({ open: false, investor: null, pdfBlob: null });
-  }
-
-  // ===== Скачивание PDF =====
   function handleDownloadPdf() {
-    const blob = shareModal.pdfBlob;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `Отчёт_${shareModal.investor.fullName}.pdf`;
-    link.click();
-
+    const url = URL.createObjectURL(shareModal.pdfBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Отчёт_${shareModal.investor.fullName}.pdf`;
+    a.click();
     URL.revokeObjectURL(url);
   }
 
-  // ===== Кнопка WhatsApp (ПК) =====
   function handleWhatsappSend() {
     handleDownloadPdf();
-
     window.open(
       `/open-whatsapp.html?msg=${encodeURIComponent(
         `Отчёт по инвестору ${shareModal.investor.fullName} готов`
@@ -167,12 +224,9 @@ function MainApp({ logout }) {
     );
   }
 
-  // ===== Кнопка Share API в модалке =====
   async function handleShareAPI() {
-    const blob = shareModal.pdfBlob;
-
     const file = new File(
-      [blob],
+      [shareModal.pdfBlob],
       `Отчёт_${shareModal.investor.fullName}.pdf`,
       { type: "application/pdf" }
     );
@@ -184,17 +238,12 @@ function MainApp({ logout }) {
       });
     }
 
-    alert("Share API не поддерживается в этом браузере.");
+    alert("Share API не поддерживается вашим браузером.");
   }
 
-  // =======================
-  //     DELETE INVESTOR
-  // =======================
+  // ===== DELETE =====
   const openDeleteModal = (inv) =>
     setDeleteModal({ open: true, investor: inv, isDeleting: false });
-
-  const closeDeleteModal = () =>
-    setDeleteModal({ open: false, investor: null, isDeleting: false });
 
   async function confirmDelete() {
     try {
@@ -202,12 +251,11 @@ function MainApp({ logout }) {
     } catch (err) {
       console.error("Ошибка удаления:", err);
     }
-    closeDeleteModal();
+
+    setDeleteModal({ open: false, investor: null, isDeleting: false });
   }
 
-  // =======================
-  //         PAYOUT
-  // =======================
+  // ===== PAYOUT =====
   const openPayoutModal = (inv) =>
     setPayoutModal({
       open: true,
@@ -217,24 +265,11 @@ function MainApp({ logout }) {
       isSaving: false,
     });
 
-  const closePayout = () =>
-    setPayoutModal({
-      open: false,
-      investor: null,
-      monthKey: "",
-      reinvest: true,
-      isSaving: false,
-    });
-
   async function confirmPayout() {
     const { investor, reinvest, monthKey } = payoutModal;
-    if (!investor) return;
-
     const percent = percents[investor.id] || 0;
     const capital = getCapitalNow(investor);
     const amount = Math.round((capital * percent) / 100);
-
-    setPayoutModal((p) => ({ ...p, isSaving: true }));
 
     await savePayout({
       investorId: investor.id,
@@ -243,18 +278,16 @@ function MainApp({ logout }) {
       reinvest,
     });
 
-    setPercents((p) => {
-      const copy = { ...p };
-      delete copy[investor.id];
-      return copy;
+    setPercents((prev) => {
+      const out = { ...prev };
+      delete out[investor.id];
+      return out;
     });
 
-    closePayout();
+    setPayoutModal({ open: false, investor: null });
   }
 
-  // =======================
-  //      WITHDRAW CAPITAL
-  // =======================
+  // ===== WITHDRAW =====
   const openWithdrawModal = (inv) =>
     setWithdrawModal({
       open: true,
@@ -264,24 +297,11 @@ function MainApp({ logout }) {
       isSaving: false,
     });
 
-  const closeWithdraw = () =>
-    setWithdrawModal({
-      open: false,
-      investor: null,
-      monthKey: "",
-      amount: "",
-      isSaving: false,
-    });
-
   async function confirmWithdraw() {
     const inv = withdrawModal.investor;
-    if (!inv) return;
-
     const amount = Number(withdrawModal.amount.replace(/\s/g, ""));
 
-    if (!amount || amount <= 0) return closeWithdraw();
-
-    setWithdrawModal((p) => ({ ...p, isSaving: true }));
+    if (!amount || amount <= 0) return;
 
     await withdrawCapital({
       investorId: inv.id,
@@ -289,14 +309,13 @@ function MainApp({ logout }) {
       amount,
     });
 
-    closeWithdraw();
+    setWithdrawModal({ open: false, investor: null });
   }
 
-  // =======================
-  //         RENDER
-  // =======================
+  // ===== RENDER =====
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 max-sm:p-2">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
+
       <InvestorsTable
         investors={investors}
         payouts={payouts}
@@ -307,29 +326,40 @@ function MainApp({ logout }) {
         onUpdateInvestor={debouncedUpdateInvestor}
         onOpenPayout={openPayoutModal}
         onOpenWithdraw={openWithdrawModal}
+
+        onOpenTopup={openTopupModal}   // 🔥 ДОБАВЛЕНО
+
+        onOpenTopupHistory={openTopupHistoryModal}  
+
         onOpenDelete={openDeleteModal}
         onShareReport={handleShareReport}
         getCapitalNow={getCapitalNow}
         getCurrentNetProfit={getCurrentNetProfit}
         getTotalProfitAllTime={getTotalProfitAllTime}
-        logout={logout} // 👈 важная пропса для кнопки "Выйти"
+        logout={logout}
       />
 
+      {/* DELETE */}
       <DeleteInvestorModal
         open={deleteModal.open}
         investor={deleteModal.investor}
         isDeleting={deleteModal.isDeleting}
-        onCancel={closeDeleteModal}
+        onCancel={() => setDeleteModal({ open: false, investor: null })}
         onConfirm={confirmDelete}
       />
 
+      {/* PAYOUT */}
       <PayoutModal
         open={payoutModal.open}
         investor={payoutModal.investor}
         monthKey={payoutModal.monthKey}
-        setMonthKey={(v) => setPayoutModal((p) => ({ ...p, monthKey: v }))}
+        setMonthKey={(v) =>
+          setPayoutModal((p) => ({ ...p, monthKey: v }))
+        }
         reinvest={payoutModal.reinvest}
-        setReinvest={(v) => setPayoutModal((p) => ({ ...p, reinvest: v }))}
+        setReinvest={(v) =>
+          setPayoutModal((p) => ({ ...p, reinvest: v }))
+        }
         percent={percents[payoutModal.investor?.id] || 0}
         draftAmount={
           payoutModal.investor
@@ -341,25 +371,56 @@ function MainApp({ logout }) {
             : 0
         }
         isSaving={payoutModal.isSaving}
-        onCancel={closePayout}
+        onCancel={() => setPayoutModal({ open: false, investor: null })}
         onConfirm={confirmPayout}
       />
 
+      {/* WITHDRAW */}
       <WithdrawCapitalModal
         open={withdrawModal.open}
         investor={withdrawModal.investor}
         monthKey={withdrawModal.monthKey}
         amount={withdrawModal.amount}
-        setMonthKey={(v) => setWithdrawModal((p) => ({ ...p, monthKey: v }))}
-        setAmount={(v) => setWithdrawModal((p) => ({ ...p, amount: v }))}
+        setMonthKey={(v) =>
+          setWithdrawModal((p) => ({ ...p, monthKey: v }))
+        }
+        setAmount={(v) =>
+          setWithdrawModal((p) => ({ ...p, amount: v }))
+        }
         isSaving={withdrawModal.isSaving}
-        onCancel={closeWithdraw}
+        onCancel={() => setWithdrawModal({ open: false, investor: null })}
         onConfirm={confirmWithdraw}
       />
+<TopupHistoryModal
+  open={topupHistoryModal.open}
+  investor={topupHistoryModal.investor}
+  payouts={payouts}
+  onClose={() =>
+    setTopupHistoryModal({ open: false, investor: null })
+  }
+/>
 
+      {/* 🔥 TOPUP (ПОПОЛНЕНИЕ) */}
+      <TopupModal
+        open={topupModal.open}
+        investor={topupModal.investor}
+        monthKey={topupModal.monthKey}
+        amount={topupModal.amount}
+        isSaving={topupModal.isSaving}
+        setMonthKey={(v) =>
+          setTopupModal((p) => ({ ...p, monthKey: v }))
+        }
+        setAmount={(v) =>
+          setTopupModal((p) => ({ ...p, amount: v }))
+        }
+        onConfirm={confirmTopup}
+        onCancel={closeTopupModal}
+      />
+
+      {/* SHARE */}
       <ShareModal
         open={shareModal.open}
-        onClose={closeShareModal}
+        onClose={() => setShareModal({ open: false, investor: null })}
         onWhatsapp={handleWhatsappSend}
         onShareAPI={handleShareAPI}
       />

@@ -121,6 +121,45 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 // ========================
 //
 
+func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        w.WriteHeader(405)
+        return
+    }
+
+    var req struct {
+        InvestorID   int64   `json:"investorId"`
+        PeriodMonth  string  `json:"periodMonth"`
+        Amount       float64 `json:"amount"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        writeJSON(w, 400, errorResponse{Error: "invalid json"})
+        return
+    }
+
+    period, err := time.Parse("2006-01", req.PeriodMonth)
+    if err != nil {
+        writeJSON(w, 400, errorResponse{Error: "invalid periodMonth"})
+        return
+    }
+
+    payout := models.Payout{
+        InvestorID:    req.InvestorID,
+        PeriodMonth:   period,
+        PayoutAmount:  req.Amount,
+        IsTopup:       true,
+    }
+
+    if err := s.repo.CreateTopup(r.Context(), &payout); err != nil {
+        writeJSON(w, 500, errorResponse{Error: err.Error()})
+        return
+    }
+
+    writeJSON(w, 201, payout)
+}
+
+
 func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
 

@@ -33,6 +33,9 @@ func (s *Server) Routes() http.Handler {
     // ===== Payouts (protected)
     mux.HandleFunc("/api/payouts", s.withAuth(s.handlePayouts))
 
+
+	mux.HandleFunc("/api/payouts/topup", s.withAuth(s.handleTopup))
+
     // ===== Auth (public)
     mux.HandleFunc("/api/login", s.handleLogin)
     mux.HandleFunc("/api/register", s.handleRegister)

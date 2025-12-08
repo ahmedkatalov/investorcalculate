@@ -65,17 +65,46 @@ export async function generateInvestorPdfBlob({
   });
 
   // Таблица месяцев
-  const rows = payouts
-    .filter(p => p.investorId === investor.id)
-    .map(p => [
-      p.periodMonth,
-      p.reinvest
-        ? "Реинвест"
-        : p.isWithdrawalCapital
-        ? "Снятие капитала"
-        : "Снятие прибыли",
-      (p.payoutAmount > 0 ? "+" : "") + p.payoutAmount + " ₽",
-    ]);
+const rows = payouts
+  .filter(p => p.investorId === investor.id)
+  .sort((a, b) => {
+    // сортируем сначала по месяцу
+    if (a.periodMonth < b.periodMonth) return -1;
+    if (a.periodMonth > b.periodMonth) return 1;
+    // затем по ID (порядок операций внутри месяца)
+    return a.id - b.id;
+  })
+  .map(p => {
+    let type = "";
+
+    if (!p.reinvest && !p.isWithdrawalCapital && !p.isWithdrawalProfit && p.payoutAmount > 0) {
+      type = "Пополнение капитала";
+    } else if (p.reinvest) {
+      type = "Реинвест";
+    } else if (p.isWithdrawalCapital) {
+      type = "Снятие капитала";
+    } else if (p.isWithdrawalProfit) {
+      type = "Снятие прибыли";
+    } else {
+      type = "Операция";
+    }
+
+    const formattedMonth = p.periodMonth
+      ? new Date(p.periodMonth + "-01").toLocaleDateString("ru-RU", {
+          month: "short",
+          year: "2-digit",
+        })
+      : "";
+
+    const sign = p.payoutAmount > 0 ? "+" : "";
+    const fmt = v => new Intl.NumberFormat("ru-RU").format(v);
+
+const amount = `${sign}${fmt(Math.abs(p.payoutAmount))} ₽`;
+
+
+    return [formattedMonth, type, amount];
+  });
+
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 30,

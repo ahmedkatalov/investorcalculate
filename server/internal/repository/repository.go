@@ -170,3 +170,20 @@ func (r *Repository) CreateUser(ctx context.Context, u *models.User) error {
         u.Email, u.PasswordHash,
     ).Scan(&u.ID, &u.CreatedAt)
 }
+func (r *Repository) CreateTopup(ctx context.Context, p *models.Payout) error {
+    query := `
+        INSERT INTO payouts (
+            investor_id, period_month, payout_amount,
+            reinvest, is_withdrawal_profit, is_withdrawal_capital,
+            is_topup
+        ) VALUES ($1, $2, $3, FALSE, FALSE, FALSE, TRUE)
+        RETURNING id, created_at
+    `
+    return r.db.QueryRowContext(
+        ctx,
+        query,
+        p.InvestorID,
+        p.PeriodMonth,
+        p.PayoutAmount,
+    ).Scan(&p.ID, &p.CreatedAt)
+}
