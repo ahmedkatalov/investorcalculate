@@ -1,4 +1,3 @@
-// investorPdfReport.js
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -8,11 +7,16 @@ async function loadFont() {
   const buf = await fetch(url).then(r => r.arrayBuffer());
   let binary = "";
   const bytes = new Uint8Array(buf);
-  bytes.forEach(b => binary += String.fromCharCode(b));
+  bytes.forEach(b => (binary += String.fromCharCode(b)));
   return btoa(binary);
 }
 
-// Генерация PDF и возврат Blob (для Share API)
+// Формат ₽
+const fmt = (v) => new Intl.NumberFormat("ru-RU").format(v);
+
+/**
+ * Генерация красивого PDF отчёта одного инвестора
+ */
 export async function generateInvestorPdfBlob({
   investor,
   payouts,
@@ -20,6 +24,7 @@ export async function generateInvestorPdfBlob({
   getCurrentNetProfit,
   getTotalProfitAllTime,
   withdrawnTotal,
+  getTopupsTotal,    // ← ДОБАВИЛИ!
 }) {
   const fontBase64 = await loadFont();
 
@@ -28,24 +33,34 @@ export async function generateInvestorPdfBlob({
   doc.addFont("Montserrat.ttf", "Montserrat", "normal");
   doc.setFont("Montserrat");
 
-  // Заголовок
+  //
+  // ===== ЗАГОЛОВОК =====
+  //
   doc.setFontSize(22);
   doc.text("Отчёт по инвестору", 40, 60);
 
   doc.setFontSize(18);
   doc.text(investor.fullName || "Без имени", 40, 90);
 
+  //
+  // ===== РАСЧЁТЫ =====
+  //
   const capital = getCapitalNow(investor);
-  const netProfit = getCurrentNetProfit(investor);
-  const totalProfitAll = getTotalProfitAllTime(investor.id);
+  const netProfit = getCurrentNetProfit(investor); // ← уже без пополнений
+  const totalProfitReal = getTotalProfitAllTime(investor.id); // чистая прибыль
+  const withdrawn = withdrawnTotal(investor.id);
+  const topups = getTopupsTotal(investor.id); // ← новые данные!
 
-  // Основная таблица
+  //
+  // ===== ОСНОВНАЯ ТАБЛИЦА =====
+  //
   const summary = [
-    ["Вложено", investor.investedAmount + " ₽"],
-    ["Капитал сейчас", capital + " ₽"],
-    ["Чистая прибыль сейчас", netProfit + " ₽"],
-    ["Прибыль за всё время", totalProfitAll + " ₽"],
-    ["Всего снято", withdrawnTotal + " ₽"],
+    ["Вложено", fmt(investor.investedAmount) + " ₽"],
+    ["Пополнения капитала (все время)", fmt(topups) + " ₽"], // ← НОВОЕ
+    ["Капитал сейчас", fmt(capital) + " ₽"],
+    ["Чистая прибыль сейчас", fmt(netProfit) + " ₽"], // уже верно
+    ["Прибыль за всё время", fmt(totalProfitReal) + " ₽"],
+    ["Всего снято", fmt(withdrawn) + " ₽"],
   ];
 
   autoTable(doc, {
@@ -56,55 +71,46 @@ export async function generateInvestorPdfBlob({
     headStyles: {
       fillColor: [34, 197, 94],
       font: "Montserrat",
-      fontStyle: "normal",
     },
     styles: {
       font: "Montserrat",
-      fontStyle: "normal",
-    }
+      fontSize: 12,
+    },
   });
 
-  // Таблица месяцев
-const rows = payouts
-  .filter(p => p.investorId === investor.id)
-  .sort((a, b) => {
-    // сортируем сначала по месяцу
-    if (a.periodMonth < b.periodMonth) return -1;
-    if (a.periodMonth > b.periodMonth) return 1;
-    // затем по ID (порядок операций внутри месяца)
-    return a.id - b.id;
-  })
-  .map(p => {
-    let type = "";
+  //
+  // ===== ТАБЛИЦА ОПЕРАЦИЙ ПО МЕСЯЦАМ =====
+  //
+  const rows = payouts
+    .filter((p) => p.investorId === investor.id)
+    .sort((a, b) => {
+      if (a.periodMonth < b.periodMonth) return -1;
+      if (a.periodMonth > b.periodMonth) return 1;
+      return a.id - b.id;
+    })
+    .map((p) => {
+      let type = "";
 
-    if (!p.reinvest && !p.isWithdrawalCapital && !p.isWithdrawalProfit && p.payoutAmount > 0) {
-      type = "Пополнение капитала";
-    } else if (p.reinvest) {
-      type = "Реинвест";
-    } else if (p.isWithdrawalCapital) {
-      type = "Снятие капитала";
-    } else if (p.isWithdrawalProfit) {
-      type = "Снятие прибыли";
-    } else {
-      type = "Операция";
-    }
+      // тип операции
+      if (p.isTopup) type = "Пополнение капитала";
+      else if (p.reinvest) type = "Реинвест";
+      else if (p.isWithdrawalCapital) type = "Снятие капитала";
+      else if (p.isWithdrawalProfit) type = "Снятие прибыли";
+      else type = "Операция";
 
-    const formattedMonth = p.periodMonth
-      ? new Date(p.periodMonth + "-01").toLocaleDateString("ru-RU", {
-          month: "short",
-          year: "2-digit",
-        })
-      : "";
+      // красивый месяц
+      const formattedMonth = p.periodMonth
+        ? new Date(p.periodMonth + "-01").toLocaleDateString("ru-RU", {
+            month: "short",
+            year: "2-digit",
+          })
+        : "";
 
-    const sign = p.payoutAmount > 0 ? "+" : "";
-    const fmt = v => new Intl.NumberFormat("ru-RU").format(v);
+      const sign = p.payoutAmount > 0 ? "+" : "";
+      const amount = `${sign}${fmt(Math.abs(p.payoutAmount))} ₽`;
 
-const amount = `${sign}${fmt(Math.abs(p.payoutAmount))} ₽`;
-
-
-    return [formattedMonth, type, amount];
-  });
-
+      return [formattedMonth, type, amount];
+    });
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 30,
@@ -114,12 +120,16 @@ const amount = `${sign}${fmt(Math.abs(p.payoutAmount))} ₽`;
     headStyles: {
       fillColor: [59, 130, 246],
       font: "Montserrat",
-      fontStyle: "normal",
     },
     styles: {
       font: "Montserrat",
-      fontStyle: "normal",
-    }
+      fontSize: 12,
+    },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 250 },
+      2: { cellWidth: 80, halign: "right" },
+    },
   });
 
   return doc.output("blob");
