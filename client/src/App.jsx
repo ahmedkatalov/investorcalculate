@@ -171,39 +171,35 @@ async function confirmTopup() {
     pdfBlob: null,
   });
 
-  async function handleShareReport(inv) {
-    if (!inv) return;
+async function handleShareReport(inv) {
+  if (!inv) return;
 
-    const pdfBlob = await generateInvestorPdfBlob({
-      investor: inv,
-      payouts,
-      getCapitalNow,
-      getCurrentNetProfit,
-      getTotalProfitAllTime,
-      withdrawnTotal: getWithdrawnCapitalTotal(inv.id),
-    });
+  const pdfBlob = await generateInvestorPdfBlob({
+    investor: inv,
+    payouts,
 
-    // mobile → Share API
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const pdfFile = new File([pdfBlob], `Отчёт_${inv.fullName}.pdf`, {
-      type: "application/pdf",
-    });
+    // передаём функции, а не значения
+    getCapitalNow,
+    getCurrentNetProfit,
+    getTotalProfitAllTime,
 
-    if (isMobile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      await navigator.share({
-        title: "Отчёт по инвестору",
-        files: [pdfFile],
-      });
-      return;
-    }
+    // ❗ ВАЖНО — здесь должна быть функция, а не вызов!
+    withdrawnTotal: getWithdrawnCapitalTotal,
 
-    // PC → modal
-    setShareModal({
-      open: true,
-      investor: inv,
-      pdfBlob,
-    });
-  }
+    // новая функция для подсчёта пополнений
+    getTopupsTotal: (id) =>
+      payouts
+        .filter((p) => p.investorId === id && p.isTopup)
+        .reduce((sum, p) => sum + (p.payoutAmount || 0), 0),
+  });
+
+  // показываем модалку с PDF
+  setShareModal({
+    open: true,
+    investor: inv,
+    pdfBlob,
+  });
+}
 
   function handleDownloadPdf() {
     const url = URL.createObjectURL(shareModal.pdfBlob);
