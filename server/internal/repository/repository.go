@@ -15,7 +15,9 @@ func New(db *sql.DB) *Repository {
 }
 
 //
-// Investors
+// ========================
+//      INVESTORS
+// ========================
 //
 
 func (r *Repository) ListInvestors(ctx context.Context) ([]models.Investor, error) {
@@ -72,8 +74,7 @@ func (r *Repository) UpdateInvestor(ctx context.Context, id int64, fullName *str
 }
 
 func (r *Repository) DeleteInvestor(ctx context.Context, id int64) error {
-    _, err := r.db.ExecContext(ctx,
-        `DELETE FROM investors WHERE id=$1`, id)
+    _, err := r.db.ExecContext(ctx, `DELETE FROM investors WHERE id=$1`, id)
     return err
 }
 
@@ -91,14 +92,17 @@ func (r *Repository) GetInvestorByID(ctx context.Context, id int64) (*models.Inv
 }
 
 //
-// Payouts
+// ========================
+//      PAYOUTS
+// ========================
 //
 
 func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
     rows, err := r.db.QueryContext(ctx,
         `SELECT id, investor_id, period_month, payout_amount, reinvest,
-                is_withdrawal_profit, is_withdrawal_capital, created_at
-         FROM payouts ORDER BY period_month, id`)
+                is_withdrawal_profit, is_withdrawal_capital, is_topup, created_at
+         FROM payouts
+         ORDER BY period_month, id`)
     if err != nil {
         return nil, err
     }
@@ -115,11 +119,11 @@ func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
             &p.Reinvest,
             &p.IsWithdrawalProfit,
             &p.IsWithdrawalCapital,
+            &p.IsTopup,   // ← добавлено!
             &p.CreatedAt,
         ); err != nil {
             return nil, err
         }
-
         out = append(out, p)
     }
     return out, nil
@@ -127,27 +131,45 @@ func (r *Repository) GetPayouts(ctx context.Context) ([]models.Payout, error) {
 
 func (r *Repository) CreatePayout(ctx context.Context, p *models.Payout) error {
     return r.db.QueryRowContext(ctx,
-        `INSERT INTO payouts 
-            (investor_id, period_month, payout_amount, reinvest,
-             is_withdrawal_profit, is_withdrawal_capital)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, created_at`,
+        `INSERT INTO payouts (
+            investor_id, period_month, payout_amount, reinvest,
+            is_withdrawal_profit, is_withdrawal_capital, is_topup
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, created_at`,
         p.InvestorID,
         p.PeriodMonth,
         p.PayoutAmount,
         p.Reinvest,
         p.IsWithdrawalProfit,
         p.IsWithdrawalCapital,
+        p.IsTopup,        // ← добавлено!
     ).Scan(&p.ID, &p.CreatedAt)
 }
 
-// ===== USERS =====
+func (r *Repository) CreateTopup(ctx context.Context, p *models.Payout) error {
+    return r.db.QueryRowContext(ctx,
+        `INSERT INTO payouts (
+            investor_id, period_month, payout_amount,
+            reinvest, is_withdrawal_profit, is_withdrawal_capital, is_topup
+        ) VALUES ($1, $2, $3, FALSE, FALSE, FALSE, TRUE)
+        RETURNING id, created_at`,
+        p.InvestorID,
+        p.PeriodMonth,
+        p.PayoutAmount,
+    ).Scan(&p.ID, &p.CreatedAt)
+}
+
+//
+// ========================
+//      USERS
+// ========================
+//
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
     var u models.User
 
     err := r.db.QueryRowContext(ctx,
-        `SELECT id, email, password_hash, created_at 
+        `SELECT id, email, password_hash, created_at
          FROM users WHERE email=$1`,
         email,
     ).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
@@ -169,21 +191,4 @@ func (r *Repository) CreateUser(ctx context.Context, u *models.User) error {
          RETURNING id, created_at`,
         u.Email, u.PasswordHash,
     ).Scan(&u.ID, &u.CreatedAt)
-}
-func (r *Repository) CreateTopup(ctx context.Context, p *models.Payout) error {
-    query := `
-        INSERT INTO payouts (
-            investor_id, period_month, payout_amount,
-            reinvest, is_withdrawal_profit, is_withdrawal_capital,
-            is_topup
-        ) VALUES ($1, $2, $3, FALSE, FALSE, FALSE, TRUE)
-        RETURNING id, created_at
-    `
-    return r.db.QueryRowContext(
-        ctx,
-        query,
-        p.InvestorID,
-        p.PeriodMonth,
-        p.PayoutAmount,
-    ).Scan(&p.ID, &p.CreatedAt)
 }
