@@ -181,6 +181,8 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
             Reinvest            bool    `json:"reinvest"`
             IsWithdrawalProfit  bool    `json:"isWithdrawalProfit"`
             IsWithdrawalCapital bool    `json:"isWithdrawalCapital"`
+                IsTopup             bool    `json:"isTopup"` // ← ДОБАВИТЬ
+
         }
 
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -201,6 +203,7 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
             Reinvest:            req.Reinvest,
             IsWithdrawalProfit:  req.IsWithdrawalProfit,
             IsWithdrawalCapital: req.IsWithdrawalCapital,
+                IsTopup:             req.IsTopup, // ← ДОБАВИТЬ
         }
 
         if err := s.repo.CreatePayout(ctx, &p); err != nil {

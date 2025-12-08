@@ -17,6 +17,7 @@ type Payout struct {
     Reinvest           bool      `json:"reinvest"`
     IsWithdrawalProfit bool      `json:"is_withdrawal_profit"`
     IsWithdrawalCapital bool     `json:"is_withdrawal_capital"`
-    IsTopup            bool      `json:"is_topup"`
+   IsTopup bool `json:"isTopup"`
+
     CreatedAt          time.Time `json:"created_at"`
 }
