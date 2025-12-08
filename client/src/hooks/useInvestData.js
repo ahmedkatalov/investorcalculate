@@ -159,16 +159,6 @@ async function deleteInvestor(id) {
   return true;
 }
 
-function updatePayouts(newPayouts) {
-  setPayouts(
-    newPayouts.map((p) => ({
-      ...p,
-      isWithdrawalProfit: !!p.isWithdrawalProfit,
-      isWithdrawalCapital: !!p.isWithdrawalCapital,
-      isTopup: !!p.isTopup,
-    }))
-  );
-}
 
 
   // =============================
@@ -189,7 +179,7 @@ return {
   payouts,
   percents,
   setPercents,
-
+    setPayouts, 
   addInvestor,
   savePayout,
   withdrawCapital,
@@ -201,7 +191,6 @@ return {
   getTotalProfitAllTime,
   getWithdrawnCapitalTotal,
 
-  updatePayouts,
 };
 
 }
