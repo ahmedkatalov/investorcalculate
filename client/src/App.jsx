@@ -138,6 +138,8 @@ function openTopupHistoryModal(inv) {
       amount: "",
       isSaving: false,
     });
+
+
 async function confirmTopup() {
   const inv = topupModal.investor;
   if (!inv) return;
@@ -151,12 +153,10 @@ async function confirmTopup() {
   try {
     await createTopup(inv.id, topupModal.monthKey, amount);
 
-    // 💥 Правильный способ обновить payouts
     const fresh = await fetchPayouts();
-    // и теперь обновляем через setPayouts из useInvestData
-    
-    // Но setPayouts тебе нужно подключить!
-    updatePayouts(fresh);
+
+    // 💥 ПРАВИЛЬНО:
+    setPayouts(fresh);
 
     closeTopupModal();
   } catch (err) {
