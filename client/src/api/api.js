@@ -116,6 +116,7 @@ export async function fetchPayouts() {
     payoutAmount: Number(p.payout_amount),
     reinvest: p.reinvest,
     isWithdrawalProfit: p.is_withdrawal_profit,
+     isTopup: p.is_topup || p.isTopup || false,  
     isWithdrawalCapital: p.is_withdrawal_capital,
     createdAt: p.created_at,
   }));

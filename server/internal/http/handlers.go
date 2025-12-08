@@ -39,17 +39,12 @@ func (s *Server) handleInvestors(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, 200, list)
 
     case http.MethodPost:
-        // 🔥 Создаём инвестора даже если фронт прислал пустые поля
         var inv models.Investor
-
         _ = json.NewDecoder(r.Body).Decode(&inv)
 
-        // Если имя пустое — оставляем пустым. Это НОРМАЛЬНО.
         if inv.FullName == "" {
             inv.FullName = ""
         }
-
-        // Если сумма пустая — ставим 0.
         if inv.InvestedAmount == 0 {
             inv.InvestedAmount = 0
         }
@@ -117,7 +112,7 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 
 //
 // ========================
-//      PAYOUTS
+//      TOPUP (ПОПОЛНЕНИЕ)
 // ========================
 //
 
@@ -128,9 +123,9 @@ func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
     }
 
     var req struct {
-        InvestorID   int64   `json:"investorId"`
-        PeriodMonth  string  `json:"periodMonth"`
-        Amount       float64 `json:"amount"`
+        InvestorID  int64   `json:"investorId"`
+        PeriodMonth string  `json:"periodMonth"`
+        Amount      float64 `json:"amount"`
     }
 
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -145,10 +140,13 @@ func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
     }
 
     payout := models.Payout{
-        InvestorID:    req.InvestorID,
-        PeriodMonth:   period,
-        PayoutAmount:  req.Amount,
-        IsTopup:       true,
+        InvestorID:   req.InvestorID,
+        PeriodMonth:  period,
+        PayoutAmount: req.Amount,
+        IsTopup:      true,    // ← пополнение
+        Reinvest:     false,
+        IsWithdrawalProfit:  false,
+        IsWithdrawalCapital: false,
     }
 
     if err := s.repo.CreateTopup(r.Context(), &payout); err != nil {
@@ -159,6 +157,11 @@ func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, 201, payout)
 }
 
+//
+// ========================
+//      PAYOUTS (выплаты)
+// ========================
+//
 
 func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
@@ -181,8 +184,6 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
             Reinvest            bool    `json:"reinvest"`
             IsWithdrawalProfit  bool    `json:"isWithdrawalProfit"`
             IsWithdrawalCapital bool    `json:"isWithdrawalCapital"`
-                IsTopup             bool    `json:"isTopup"` // ← ДОБАВИТЬ
-
         }
 
         if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -203,7 +204,7 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
             Reinvest:            req.Reinvest,
             IsWithdrawalProfit:  req.IsWithdrawalProfit,
             IsWithdrawalCapital: req.IsWithdrawalCapital,
-                IsTopup:             req.IsTopup, // ← ДОБАВИТЬ
+            IsTopup:             false,   // ← ВАЖНО: выплаты НЕ пополнение!
         }
 
         if err := s.repo.CreatePayout(ctx, &p); err != nil {

@@ -14,7 +14,6 @@ type Server struct {
 	secretRegCode string
 }
 
-
 func NewServer(repo *repository.Repository, cfg *config.Config) *Server {
 	return &Server{
 		repo:          repo,
@@ -24,30 +23,46 @@ func NewServer(repo *repository.Repository, cfg *config.Config) *Server {
 }
 
 func (s *Server) Routes() http.Handler {
-    mux := http.NewServeMux()
+	mux := http.NewServeMux()
 
-    // ===== Investors (protected)
-    mux.HandleFunc("/api/investors", s.withAuth(s.handleInvestors))
-    mux.HandleFunc("/api/investors/", s.withAuth(s.handleInvestorByID))
+	//
+	// ============================
+	//     AUTH (public)
+	// ============================
+	//
+	mux.HandleFunc("/api/login", s.handleLogin)
+	mux.HandleFunc("/api/register", s.handleRegister)
 
-    // ===== Payouts (protected)
-// сначала более длинный путь
-mux.HandleFunc("/api/payouts/topup", s.withAuth(s.handleTopup))
-// потом обычный payouts
-mux.HandleFunc("/api/payouts", s.withAuth(s.handlePayouts))
+	//
+	// ============================
+	//     INVESTORS (protected)
+	// ============================
+	//
+	mux.HandleFunc("/api/investors", s.withAuth(s.handleInvestors))
+	mux.HandleFunc("/api/investors/", s.withAuth(s.handleInvestorByID))
 
+	//
+	// ============================
+	//     PAYOUTS (protected)
+	// ============================
+	//
+	// ВАЖНО: сперва более длинный маршрут
+	mux.HandleFunc("/api/payouts/topup", s.withAuth(s.handleTopup))
 
-    // ===== Auth (public)
-    mux.HandleFunc("/api/login", s.handleLogin)
-    mux.HandleFunc("/api/register", s.handleRegister)
+	// Затем общий обработчик выплат
+	mux.HandleFunc("/api/payouts", s.withAuth(s.handlePayouts))
 
-    // CORS
-    c := cors.New(cors.Options{
-        AllowedOrigins:   []string{"*"},
-        AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowedHeaders:   []string{"*"},
-        AllowCredentials: true,
-    })
+	//
+	// ============================
+	//     CORS
+	// ============================
+	//
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	})
 
-    return c.Handler(mux)
+	return c.Handler(mux)
 }
