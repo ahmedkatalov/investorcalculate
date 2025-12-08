@@ -59,10 +59,28 @@ const getWithdrawnCapitalTotal = (investorId) =>
   }, 0);
 
 
-  const getCapitalNow = (inv) => {
-    const base = Number(inv.investedAmount || 0);
-    return base + getReinvestedTotal(inv.id) - getWithdrawnCapitalTotal(inv.id);
-  };
+const getCapitalNow = (inv) => {
+  const base = Number(inv.investedAmount || 0);
+
+  const reinvested = payouts.reduce((sum, p) => {
+    if (p.investorId === inv.id && p.reinvest && !p.isWithdrawalCapital) {
+      return sum + (p.payoutAmount || 0);
+    }
+    return sum;
+  }, 0);
+
+  const withdrawn = getWithdrawnCapitalTotal(inv.id);
+
+  // 🔥 НОВОЕ: учитываем пополнения капитала
+  const topups = payouts.reduce((sum, p) => {
+    if (p.investorId === inv.id && p.isTopup) {
+      return sum + (p.payoutAmount || 0);
+    }
+    return sum;
+  }, 0);
+
+  return base + reinvested + topups - withdrawn;
+};
 
   const getCurrentNetProfit = (inv) => {
     const capital = getCapitalNow(inv);

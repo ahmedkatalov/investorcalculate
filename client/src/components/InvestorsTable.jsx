@@ -44,6 +44,7 @@ export default function InvestorsTable({
     const byMonthInv = new Map();
 
     payouts.forEach((p) => {
+       if (p.isTopup) return; 
       if (!p.periodMonth) return;
       if (!byMonthInv.has(p.periodMonth)) {
         byMonthInv.set(p.periodMonth, new Map());
