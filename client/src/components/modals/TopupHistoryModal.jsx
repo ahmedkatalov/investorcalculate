@@ -5,6 +5,19 @@ const fmt = (v) =>
     ? new Intl.NumberFormat("ru-RU").format(v)
     : v;
 
+// Универсальный парсер даты: поддерживает YYYY-MM и YYYY-MM-DD
+function parseAnyDate(str) {
+  if (!str) return null;
+
+  // Уже полная дата
+  if (str.length === 10) {
+    return new Date(str);
+  }
+
+  // Только месяц → добавляем 01
+  return new Date(str + "-01");
+}
+
 export default function TopupHistoryModal({
   open,
   investor,
@@ -28,16 +41,19 @@ export default function TopupHistoryModal({
         </h2>
 
         {topups.length === 0 ? (
-          <div className="text-center text-slate-400 py-6">
-            Нет пополнений
-          </div>
+          <div className="text-center text-slate-400 py-6">Нет пополнений</div>
         ) : (
           <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
             {topups.map((t) => {
-              const label = new Date(t.periodMonth + "-01").toLocaleDateString(
-                "ru-RU",
-                { month: "long", year: "numeric" }
-              );
+              const date = parseAnyDate(t.periodMonth);
+
+              const label = date
+                ? date.toLocaleDateString("ru-RU", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "—";
 
               return (
                 <div
