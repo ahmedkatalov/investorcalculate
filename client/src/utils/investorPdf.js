@@ -1,159 +1,150 @@
-// client/src/utils/investorPdf.js
+// client/src/utils/investorPdfReport.js
 import jsPDF from "jspdf";
-import "jspdf-autotable";
-import { saveAs } from "file-saver";
-import ROBOTO_REGULAR_BASE64 from "../../public/fonts/robotoRegularBase64";
+import autoTable from "jspdf-autotable";
 
-// формат числа с пробелами
-const fmt = (v) =>
-  typeof v === "number"
-    ? new Intl.NumberFormat("ru-RU").format(v)
-    : v ?? "";
+// Загружаем Montserrat из public/fonts/Montserrat.ttf
+async function loadFont() {
+  const url = "/fonts/Montserrat.ttf";
+  const buf = await fetch(url).then((r) => r.arrayBuffer());
+  let binary = "";
+  const bytes = new Uint8Array(buf);
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
+  return btoa(binary);
+}
 
-// красивый формат месяца (2025-12 -> Дек 25)
-const formatMonth = (periodMonth) => {
-  if (!periodMonth) return "";
-  const [y, m] = periodMonth.split("-");
-  const d = new Date(Number(y), Number(m) - 1, 1);
-  return d.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" });
-};
+// Формат ₽
+const fmt = (v) => new Intl.NumberFormat("ru-RU").format(v);
 
 /**
- * Генерация PDF-отчёта по ОДНОМУ инвестору
+ * Генерация красивого PDF-отчёта
  */
-export function exportInvestorPdf({
+export async function generateInvestorPdfBlob({
   investor,
-  payouts, // весь массив payouts
+  payouts,
   getCapitalNow,
   getCurrentNetProfit,
-  getTotalProfitAllTime,
-  getWithdrawnTotal, // сумма снятого (прибыль + капитал)
+  withdrawnTotal,
+  getTopupsTotal,
 }) {
-  if (!investor) return;
+  const fontBase64 = await loadFont();
 
-  // ===== 1) создаём документ + шрифт =====
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
+  const doc = new jsPDF("p", "pt", "a4");
+  doc.addFileToVFS("Montserrat.ttf", fontBase64);
+  doc.addFont("Montserrat.ttf", "Montserrat", "normal");
+  doc.setFont("Montserrat", "normal");
 
-  // вшиваем шрифт с кириллицей
-  doc.addFileToVFS("Roboto-Regular.ttf", ROBOTO_REGULAR_BASE64);
-  doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
-  doc.setFont("Roboto");
-
-  // ===== 2) общие данные по инвестору =====
-  const capitalNow = getCapitalNow(investor);
-  const netProfit = getCurrentNetProfit(investor);
-  const totalProfit = getTotalProfitAllTime(investor.id);
-  const totalWithdrawn = getWithdrawnTotal(investor.id);
-
-  let y = 15;
+  //
+  // ===== ЗАГОЛОВОК =====
+  //
+  doc.setFontSize(22);
+  doc.text("Отчёт по инвестору", 40, 60);
 
   doc.setFontSize(18);
-  doc.text("Инвестиционный отчет", 14, y);
-  y += 8;
+  doc.text(investor.fullName || "Без имени", 40, 95);
 
-  doc.setFontSize(12);
-  doc.text(`Инвестор: ${investor.fullName || "Без имени"}`, 14, y);
-  y += 7;
-
-  doc.setFontSize(11);
-  doc.text(`ID инвестора: ${investor.id}`, 14, y);
-  y += 6;
-
+  // Дата создания инвестора
   if (investor.createdAt) {
     const created = new Date(investor.createdAt).toLocaleDateString("ru-RU");
-    doc.text(`Дата создания: ${created}`, 14, y);
-    y += 6;
+    doc.setFontSize(11);
+    doc.text(`Создан: ${created}`, 40, 120);
   }
 
-  y += 4;
-  doc.setLineWidth(0.3);
-  doc.line(14, y, 195, y);
-  y += 8;
+  //
+  // ===== РАСЧЁТЫ =====
+  //
+  const invested = investor.investedAmount;
+  const capital = getCapitalNow(investor);           // капитал с учётом пополнений
+  const profitNow = getCurrentNetProfit(investor);   // чистая прибыль (без пополнений)
+  const topups = getTopupsTotal(investor.id);        // все пополнения
+  const withdrawn = withdrawnTotal(investor.id);     // снято (прибыль + капитал)
 
-  // Блок итогов
-  doc.setFontSize(12);
-  doc.text("Итоги по инвестору", 14, y);
-  y += 7;
+  //
+  // ===== ТАБЛИЦА ИТОГОВ =====
+  //
+  const summary = [
+    ["Вложено", `${fmt(invested)} ₽`],
+    ["Пополнения за всё время", `${fmt(topups)} ₽`],
+    ["Капитал сейчас", `${fmt(capital)} ₽`],
+    ["Чистая прибыль сейчас", `${fmt(profitNow)} ₽`],
+    ["Всего снято", `${fmt(withdrawn)} ₽`],
+  ];
 
-  doc.setFontSize(11);
-  doc.text(`Вложено: ${fmt(investor.investedAmount)} ₽`, 14, y);
-  y += 6;
-  doc.text(`Капитал сейчас: ${fmt(capitalNow)} ₽`, 14, y);
-  y += 6;
-  doc.text(`Чистая прибыль сейчас: ${fmt(netProfit)} ₽`, 14, y);
-  y += 6;
-  doc.text(`Прибыль за всё время: ${fmt(totalProfit)} ₽`, 14, y);
-  y += 6;
-  doc.text(`Всего снято (прибыль + капитал): ${fmt(totalWithdrawn)} ₽`, 14, y);
-  y += 10;
+  autoTable(doc, {
+    startY: 150,
+    head: [["Показатель", "Значение"]],
+    body: summary,
+    theme: "striped",
+    margin: { left: 40, right: 40 },
 
-  // ===== 3) детальная таблица по операциям =====
-  const investorPayouts = payouts
-    .filter((p) => p.investorId === investor.id)
-    .sort((a, b) => (a.periodMonth || "").localeCompare(b.periodMonth || ""));
-
-  const rows = investorPayouts.map((p) => {
-    let type = "";
-    if (p.reinvest) type = "Реинвест";
-    else if (p.isWithdrawalProfit) type = "Вывод прибыли";
-    else if (p.isWithdrawalCapital) type = "Снятие капитала";
-    else type = "Операция";
-
-    const monthLabel = formatMonth(p.periodMonth);
-    const sign =
-      p.payoutAmount > 0 ? "+" : p.payoutAmount < 0 ? "-" : "";
-    const abs = Math.abs(p.payoutAmount || 0);
-
-    return [
-      monthLabel,
-      type,
-      `${sign} ${fmt(abs)} ₽`,
-    ];
+    headStyles: {
+      fillColor: [34, 197, 94],
+      font: "Montserrat",
+      fontStyle: "normal",
+      textColor: 255,
+    },
+    styles: {
+      font: "Montserrat",
+      fontStyle: "normal",
+      fontSize: 12,
+    },
+    columnStyles: {
+      0: { cellWidth: 260 },
+      1: { cellWidth: 200 },
+    },
   });
 
-  doc.setFontSize(12);
-  doc.text("Движение по месяцам", 14, y);
-  y += 4;
+  //
+  // ===== ТАБЛИЦА ОПЕРАЦИЙ =====
+  //
+  const rows = payouts
+    .filter((p) => p.investorId === investor.id)
+    .sort((a, b) => (a.periodMonth < b.periodMonth ? -1 : 1))
+    .map((p) => {
+      let type = "";
+      if (p.isTopup) type = "Пополнение капитала";
+      else if (p.reinvest) type = "Реинвест";
+      else if (p.isWithdrawalCapital) type = "Снятие капитала";
+      else if (p.isWithdrawalProfit) type = "Снятие прибыли";
+      else type = "Операция";
 
-  if (rows.length === 0) {
-    doc.setFontSize(11);
-    doc.text("Нет операций по этому инвестору.", 14, y + 6);
-  } else {
-    doc.autoTable({
-      startY: y,
-      head: [["Месяц", "Тип операции", "Сумма"]],
-      body: rows,
-      styles: {
-        font: "Roboto",
-        fontSize: 10,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42], // тёмно-синий как в UI
-        textColor: 255,
-      },
-      columnStyles: {
-        0: { cellWidth: 30 }, // месяц
-        1: { cellWidth: 90 }, // тип
-        2: { cellWidth: 40, halign: "right" }, // сумма
-      },
-      margin: { left: 14, right: 14 },
+      // форматируем дату
+      const formattedMonth = p.periodMonth
+        ? new Date(p.periodMonth + "-01").toLocaleDateString("ru-RU", {
+            month: "short",
+            year: "2-digit",
+          })
+        : "";
+
+      const sign = p.payoutAmount > 0 ? "+" : "";
+      const amount = `${sign}${fmt(Math.abs(p.payoutAmount))} ₽`;
+
+      return [formattedMonth, type, amount];
     });
-  }
 
-  // ===== 4) сохраняем PDF =====
-  const safeName = (investor.fullName || `investor_${investor.id}`)
-    .replace(/[\\/:*?"<>|]/g, "_");
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 40,
+    head: [["Месяц", "Тип операции", "Сумма"]],
+    body: rows,
+    theme: "grid",
+    margin: { left: 40, right: 40 },
 
-  const fileName = `Отчет_${safeName}.pdf`;
+    headStyles: {
+      fillColor: [59, 130, 246],
+      font: "Montserrat",
+      fontStyle: "normal",
+      textColor: 255,
+    },
+    styles: {
+      font: "Montserrat",
+      fontStyle: "normal",
+      fontSize: 12,
+    },
+    columnStyles: {
+      0: { cellWidth: 80 },
+      1: { cellWidth: 260 },
+      2: { cellWidth: 80, halign: "right" },
+    },
+  });
 
-  const blob = doc.output("blob");
-  saveAs(blob, fileName);
-
-  // ===== 5) открываем WhatsApp (без файла, но чат сразу) =====
-  // можно добавить номер, например wa.me/79991234567
-  window.open("https://wa.me/", "_blank");
+  return doc.output("blob");
 }

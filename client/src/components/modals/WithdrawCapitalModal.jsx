@@ -46,12 +46,13 @@ export default function WithdrawCapitalModal({
         {/* Месяц */}
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-slate-300">Месяц операции</span>
-          <input
-            type="month"
-            value={monthKey}
-            onChange={(e) => setMonthKey(e.target.value)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 outline-none focus:ring-2 focus:ring-red-400"
-          />
+<input
+  type="date"
+  value={monthKey}
+  onChange={(e) => setMonthKey(e.target.value)}
+  className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 outline-none focus:ring-2 focus:ring-red-400"
+/>
+
         </label>
 
         <div className="flex justify-end gap-3">

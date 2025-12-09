@@ -73,7 +73,7 @@ export default function MainApp({ logout }) {
   }, []);
 
   const debouncedUpdateInvestor = useMemo(
-    () => debounce(updateInvestor, 2000),
+    () => debounce(updateInvestor, 1200),
     [updateInvestor]
   );
 

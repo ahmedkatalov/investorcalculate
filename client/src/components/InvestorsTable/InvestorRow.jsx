@@ -57,7 +57,7 @@ export default function InvestorRow({
   );
 
   const debouncedSave = useMemo(
-    () => debounce((id, data) => onUpdateInvestor(id, data), 2000),
+    () => debounce((id, data) => onUpdateInvestor(id, data), 1200),
     []
   );
 
