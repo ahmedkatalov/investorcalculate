@@ -8,18 +8,32 @@ export default function ExcelExporter({
   getCurrentNetProfit,
   getTotalProfitAllTime,
 }) {
-  // ГРУППИРУЕМ ВСЕ payout по месяцам и слотам
+  // ================================
+  // РЕАЛЬНАЯ ДАТА ОПЕРАЦИИ
+  // ================================
+  function getRealDate(p) {
+    if (p.periodDate) return p.periodDate;            // YYYY-MM-DD
+    if (p.periodMonth) return p.periodMonth + "-01";  // старый формат
+    return null;
+  }
+
+  // =========================================
+  // Группируем payout по реальному месяцу
+  // =========================================
   function buildMonthSlots() {
     const byMonthInv = new Map();
 
     payouts.forEach((p) => {
-      if (!p.periodMonth) return;
+      const realDate = getRealDate(p);
+      if (!realDate) return;
 
-      if (!byMonthInv.has(p.periodMonth)) {
-        byMonthInv.set(p.periodMonth, new Map());
+      const month = realDate.slice(0, 7); // YYYY-MM
+
+      if (!byMonthInv.has(month)) {
+        byMonthInv.set(month, new Map());
       }
 
-      const invMap = byMonthInv.get(p.periodMonth);
+      const invMap = byMonthInv.get(month);
       const list = invMap.get(p.investorId) || [];
       list.push(p);
       invMap.set(p.investorId, list);
@@ -48,9 +62,7 @@ export default function ExcelExporter({
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Инвесторы");
 
-    // =============================
-    //   СТИЛИ ДЛЯ ШАПКИ
-    // =============================
+    // ============ Стили ============
     const headerStyle = {
       font: { bold: true, size: 12 },
       alignment: { vertical: "middle", horizontal: "center" },
@@ -72,14 +84,9 @@ export default function ExcelExporter({
       },
     };
 
-    // =============================
-    //   СТРОИМ СЛОТЫ МЕСЯЦЕВ B
-    // =============================
+    // ============ Динамика месяцев ============
     const { slots, byMonthInv } = buildMonthSlots();
 
-    // =============================
-    //   ШАПКА ТАБЛИЦЫ
-    // =============================
     const baseColumns = [
       { header: "ID", key: "id", width: 10 },
       { header: "ФИО", key: "fullName", width: 30 },
@@ -90,7 +97,6 @@ export default function ExcelExporter({
       { header: "Всего снято капитала", key: "withdrawTotal", width: 20 },
     ];
 
-    // Добавляем месячные слоты
     const dynamicColumns = slots.map((slot, i) => {
       const [y, m] = slot.month.split("-");
       const d = new Date(Number(y), Number(m) - 1, 1);
@@ -107,14 +113,9 @@ export default function ExcelExporter({
 
     sheet.columns = [...baseColumns, ...dynamicColumns];
 
-    // применяем стиль на шапку
-    sheet.getRow(1).eachCell((cell) => {
-      cell.style = headerStyle;
-    });
+    sheet.getRow(1).eachCell((cell) => (cell.style = headerStyle));
 
-    // =============================
-    //   ЗАПОЛНЕНИЕ ДАННЫМИ
-    // =============================
+    // ========= Заполнение строк =========
     investors.forEach((inv) => {
       const row = {
         id: inv.id,
@@ -128,7 +129,6 @@ export default function ExcelExporter({
           .reduce((s, p) => s + Math.abs(p.payoutAmount), 0),
       };
 
-      // месячные слоты
       slots.forEach((slot, idx) => {
         const invMap = byMonthInv.get(slot.month);
         if (!invMap) return;
@@ -141,52 +141,37 @@ export default function ExcelExporter({
           return;
         }
 
+        const realDate = getRealDate(p);
+        const displayDate = realDate
+          ? new Date(realDate).toLocaleDateString("ru-RU")
+          : "";
+
         const abs = Math.abs(p.payoutAmount);
         const sign =
-          p.reinvest ? "+" : p.isWithdrawalCapital || p.isWithdrawalProfit ? "-" : "";
+          p.isTopup
+            ? "+"
+            : p.reinvest
+            ? "+"
+            : p.isWithdrawalCapital || p.isWithdrawalProfit
+            ? "-"
+            : "";
 
-        row[`slot_${idx}`] = `${sign} ${abs} ₽`;
+        row[`slot_${idx}`] = `${displayDate}: ${sign}${abs} ₽`;
       });
 
       sheet.addRow(row);
     });
 
-    // Цвета и стили
+    // Цвета
     sheet.eachRow((row, rowIndex) => {
-      row.eachCell((cell, colIndex) => {
+      row.eachCell((cell) => {
         cell.style = { ...cell.style, ...cellStyle };
-
-        if (rowIndex === 1) return; // пропускаем шапку
-
-        const header = sheet.getRow(1).getCell(colIndex).value;
-
-        if (typeof header !== "string") return;
-
-        // ищем ячейки месячных слотов
-        if (header.includes("(")) {
-          const value = cell.value || "";
-
-          if (value.startsWith("+")) {
-            cell.font = { color: { argb: "00AA00" }, bold: true }; // зелёный
-          } else if (value.startsWith("-")) {
-            if (value.includes("₽")) {
-              cell.font = {
-                color: { argb: "CC0000" },
-                bold: true,
-              }; // красный (капитал)
-            } else {
-              cell.font = { color: { argb: "666666" } }; // серый (прибыль)
-            }
-          }
-        }
       });
     });
 
-    // =============================
-    //   СОХРАНЕНИЕ
-    // =============================
-    const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), "investors_report.xlsx");
+    // ========= Сохранение =========
+    const buf = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buf]), "investors_report.xlsx");
   };
 
   return (

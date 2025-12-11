@@ -243,46 +243,47 @@ export default function InvestorsTable({
               </th>
 
               {/* Месяцы */}
-              {visibleMonthSlots.map((slot, idx) => {
-                const [y, m] = slot.month.split("-");
-                const labelDate = new Date(Number(y), Number(m) - 1, 1);
-                const label = labelDate.toLocaleDateString("ru-RU", {
-                  month: "short",
-                  year: "2-digit",
-                });
+{visibleMonthSlots.map((slot, idx) => {
+  const [y, m] = slot.month.split("-");
+  const labelDate = new Date(Number(y), Number(m) - 1, 1);
 
-                const isFirst = idx === 0;
-                const isLast = idx === visibleMonthSlots.length - 1;
+  const label = labelDate.toLocaleDateString("ru-RU", {
+    month: "short",
+    year: "2-digit",
+  });
 
-                return (
-                  <th
-                    key={`${slot.month}-${slot.index}`}
-                    className="sticky top-0 py-2 px-2 min-w-[95px] border-r border-slate-600 bg-slate-700 text-xs whitespace-nowrap"
-                  >
-                    <div className="flex items-center justify-between">
-                      {isFirst && hasPrevMonths && (
-                        <button
-                          onClick={handlePrevMonths}
-                          className="px-2 py-1 rounded bg-slate-600 hover:bg-slate-500"
-                        >
-                          ‹
-                        </button>
-                      )}
+  const isFirst = idx === 0;
+  const isLast = idx === visibleMonthSlots.length - 1;
 
-                      <span className="font-medium">{label}</span>
+  return (
+    <th
+      key={`${slot.month}-${slot.index}`}
+      className="sticky top-0 py-2 px-2 min-w-[95px] border-r border-slate-600 bg-slate-700 text-xs whitespace-nowrap"
+    >
+      <div className="flex items-center justify-between">
+        {isFirst && hasPrevMonths && (
+          <button
+            onClick={handlePrevMonths}
+            className="px-2 py-1 rounded bg-slate-600 hover:bg-slate-500"
+          >
+            ‹
+          </button>
+        )}
 
-                      {isLast && hasNextMonths && (
-                        <button
-                          onClick={handleNextMonths}
-                          className="px-2 py-1 rounded bg-slate-600 hover:bg-slate-500"
-                        >
-                          ›
-                        </button>
-                      )}
-                    </div>
-                  </th>
-                );
-              })}
+        <span className="font-medium">{label}</span>
+
+        {isLast && hasNextMonths && (
+          <button
+            onClick={handleNextMonths}
+            className="px-2 py-1 rounded bg-slate-600 hover:bg-slate-500"
+          >
+            ›
+          </button>
+        )}
+      </div>
+    </th>
+  );
+})}
 
               <th className="sticky top-0 py-3 px-4 min-w-[140px] border-r border-slate-600 bg-slate-700">
                 Чистая прибыль
