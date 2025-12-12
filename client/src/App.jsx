@@ -50,10 +50,11 @@ export default function MainApp({ logout }) {
   } = useInvestData();
 
   // текущий месяц
-  const currentMonthKey = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  }, []);
+const currentMonthKey = useMemo(() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}, []);
+
 
   const debouncedUpdateInvestor = useMemo(
     () => debounce(updateInvestor, 1200),
@@ -125,6 +126,11 @@ export default function MainApp({ logout }) {
 
   // CONFIRM TOPUP
   async function confirmTopup() {
+    if (!topupModal.monthKey || topupModal.monthKey.length !== 10) {
+  alert("Выберите дату полностью");
+  return;
+}
+
     const inv = topupModal.investor;
     if (!inv) return;
 
