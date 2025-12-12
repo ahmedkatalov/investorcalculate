@@ -1,3 +1,5 @@
+// useInvestData.js
+
 import { useEffect, useState, useCallback } from "react";
 import {
   API_URL,
@@ -19,7 +21,19 @@ export function useInvestData() {
   // =============================
   useEffect(() => {
     fetchInvestors().then((d) => setInvestors(Array.isArray(d) ? d : []));
-    fetchPayouts().then((d) => setPayouts(Array.isArray(d) ? d : []));
+
+    fetchPayouts().then((d) =>
+      setPayouts(
+        Array.isArray(d)
+          ? d.map((p) => ({
+              ...p,
+              isWithdrawalProfit: !!p.isWithdrawalProfit,
+              isWithdrawalCapital: !!p.isWithdrawalCapital,
+              isTopup: !!p.isTopup || !!p.is_topup
+            }))
+          : []
+      )
+    );
   }, []);
 
   // =============================
@@ -31,7 +45,7 @@ export function useInvestData() {
       .reduce((sum, p) => sum + (p.payoutAmount || 0), 0);
 
   // =============================
-  //   СНЯТИЕ КАПИТАЛА
+  //   СНЯТИЯ КАПИТАЛА
   // =============================
   const getWithdrawnCapitalTotal = (investorId) =>
     payouts
@@ -39,7 +53,7 @@ export function useInvestData() {
       .reduce((sum, p) => sum + Math.abs(p.payoutAmount || 0), 0);
 
   // =============================
-  //   ПОПОЛНЕНИЯ
+  //   ПОПОЛНЕНИЯ (ТОПАПЫ)
   // =============================
   const getTopupsTotal = (investorId) =>
     payouts
@@ -60,26 +74,29 @@ export function useInvestData() {
   };
 
   // =============================
-  //   ЧИСТАЯ ПРИБЫЛЬ
+  //   ЧИСТАЯ ПРИБЫЛЬ (В РЕАЛЬНОМ ВРЕМЕНИ)
   // =============================
-  const getCurrentNetProfit = (inv) =>
-    payouts
+  const getCurrentNetProfit = (inv) => {
+    const net = payouts
       .filter((p) => p.investorId === inv.id)
       .reduce((sum, p) => {
-        if (p.reinvest) return sum + p.payoutAmount;
-        if (p.isWithdrawalProfit) return sum - Math.abs(p.payoutAmount);
+        if (p.reinvest) return sum + (p.payoutAmount || 0);
+        if (p.isWithdrawalProfit) return sum - Math.abs(p.payoutAmount || 0);
         return sum;
       }, 0);
 
+    return Math.max(net, 0);
+  };
+
   // =============================
-  //   ПРИБЫЛЬ ЗА ВСЁ ВРЕМЯ
+  //   ПРИБЫЛЬ ЗА ВСЁ ВРЕМЯ (НАКОПИТЕЛЬНАЯ)
   // =============================
   const getTotalProfitAllTime = (investorId) =>
     payouts
       .filter(
         (p) =>
           p.investorId === investorId &&
-          (p.reinvest || p.isWithdrawalProfit)
+          (p.reinvest === true || p.isWithdrawalProfit === true)
       )
       .reduce((sum, p) => sum + Math.abs(p.payoutAmount || 0), 0);
 
@@ -103,7 +120,10 @@ export function useInvestData() {
       body: JSON.stringify(body)
     });
 
-    if (!res.ok) return;
+    if (!res.ok) {
+      console.error("❌ UPDATE INVESTOR FAILED:", await res.text());
+      return;
+    }
 
     setInvestors((prev) =>
       prev.map((i) =>
@@ -119,32 +139,43 @@ export function useInvestData() {
   }, []);
 
   // =============================
-  //   ДОБАВИТЬ ИНВЕСТОРА
+  //   СОЗДАТЬ ИНВЕСТОРА
   // =============================
   async function addInvestor() {
     await createInvestor("", 0);
-    setInvestors(await fetchInvestors());
+    const list = await fetchInvestors();
+    setInvestors(list);
   }
 
   // =============================
-  //   СОХРАНЕНИЕ ВЫПЛАТЫ
+  //   СОХРАНЕНИЕ ВЫПЛАТЫ (ПРИБЫЛЬ)
   // =============================
-  async function savePayout({ investorId, date, amount, reinvest }) {
-    if (reinvest) {
-      await createReinvest(investorId, date, amount);
-    } else {
-      await createTakeProfit(investorId, date, amount);
-    }
+  async function savePayout({ investorId, month, amount, reinvest }) {
+    if (reinvest) await createReinvest(investorId, month, amount);
+    else await createTakeProfit(investorId, month, amount);
 
-    setPayouts(await fetchPayouts());
+    const fresh = await fetchPayouts();
+    setPayouts(
+      fresh.map((p) => ({
+        ...p,
+        isTopup: !!p.isTopup || !!p.is_topup
+      }))
+    );
   }
 
   // =============================
   //   СНЯТИЕ КАПИТАЛА
   // =============================
-  async function withdrawCapital({ investorId, date, amount }) {
-    await createCapitalWithdraw(investorId, date, amount);
-    setPayouts(await fetchPayouts());
+  async function withdrawCapital({ investorId, month, amount }) {
+    await createCapitalWithdraw(investorId, month, amount);
+
+    const fresh = await fetchPayouts();
+    setPayouts(
+      fresh.map((p) => ({
+        ...p,
+        isTopup: !!p.isTopup || !!p.is_topup
+      }))
+    );
   }
 
   // =============================
@@ -164,11 +195,15 @@ export function useInvestData() {
     setInvestors((prev) => prev.filter((i) => i.id !== id));
   }
 
+  // =============================
+  //   EXPORT
+  // =============================
   return {
     investors,
     payouts,
     percents,
     setPercents,
+    setPayouts,
 
     addInvestor,
     savePayout,
