@@ -36,7 +36,6 @@ export default function InvestorRow({
   onOpenWithdraw,
   onOpenDelete,
 
-  // 🔥 новые функции
   onOpenTopup,
   onOpenTopupHistory,
 
@@ -50,15 +49,30 @@ export default function InvestorRow({
     formatMoneyInput(inv.investedAmount ?? "")
   );
 
+  // ✅ НОВОЕ: локальная доля прибыли
+  const [localShare, setLocalShare] = useState(
+    inv.profitShare !== undefined && inv.profitShare !== null
+      ? String(inv.profitShare)
+      : "50"
+  );
+
   useEffect(() => setLocalName(inv.fullName || ""), [inv.id, inv.fullName]);
   useEffect(
     () => setLocalInvested(formatMoneyInput(inv.investedAmount ?? "")),
     [inv.id, inv.investedAmount]
   );
 
+  useEffect(() => {
+    setLocalShare(
+      inv.profitShare !== undefined && inv.profitShare !== null
+        ? String(inv.profitShare)
+        : "50"
+    );
+  }, [inv.id, inv.profitShare]);
+
   const debouncedSave = useMemo(
     () => debounce((id, data) => onUpdateInvestor(id, data), 1200),
-    []
+    [onUpdateInvestor]
   );
 
   const draft = Math.round((capitalNow * Number(percentValue || 0)) / 100);
@@ -94,6 +108,33 @@ export default function InvestorRow({
                      border border-transparent hover:border-slate-600 
                      focus:ring-2 focus:ring-blue-400"
           placeholder="Введите ФИО"
+        />
+      </td>
+
+      {/* ✅ Доля (%) */}
+      <td className="py-2 px-4 border-r border-slate-700/50 text-center min-w-[90px]">
+        <input
+          type="text"
+          value={localShare}
+          onChange={(e) => {
+            let v = e.target.value;
+            v = v.replace(/,/g, ".");
+            v = v.replace(/[^0-9.]/g, "");
+
+            const parts = v.split(".");
+            if (parts.length > 2) v = parts[0] + "." + parts[1];
+
+            // ограничение 0–100
+            const num = Number(v);
+            if (num > 100) return;
+
+            setLocalShare(v);
+            debouncedSave(inv.id, { profitShare: num || 0 });
+          }}
+          className="w-full text-center bg-transparent px-2 py-1 rounded-lg 
+                     outline-none border border-transparent hover:border-slate-600 
+                     focus:ring-2 focus:ring-emerald-400"
+          placeholder="50"
         />
       </td>
 
@@ -135,10 +176,27 @@ export default function InvestorRow({
                      transition-all duration-150 active:scale-90 shadow-inner"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="4" width="16" height="16" rx="3"
-                    stroke="#22c55e" strokeWidth="1.6" />
-              <path d="M12 8v8" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M8 12h8" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" />
+              <rect
+                x="4"
+                y="4"
+                width="16"
+                height="16"
+                rx="3"
+                stroke="#22c55e"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M12 8v8"
+                stroke="#22c55e"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8 12h8"
+                stroke="#22c55e"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
 
@@ -151,11 +209,33 @@ export default function InvestorRow({
                      transition-all duration-150 active:scale-90 shadow-inner"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="5" y="4" width="14" height="16" rx="2"
-                    stroke="#9ca3af" strokeWidth="1.6"/>
-              <path d="M9 8h6" stroke="#9ca3af" strokeWidth="1.6" strokeLinecap="round"/>
-              <path d="M9 12h6" stroke="#9ca3af" strokeWidth="1.6" strokeLinecap="round"/>
-              <path d="M9 16h4" stroke="#9ca3af" strokeWidth="1.6" strokeLinecap="round"/>
+              <rect
+                x="5"
+                y="4"
+                width="14"
+                height="16"
+                rx="2"
+                stroke="#9ca3af"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M9 8h6"
+                stroke="#9ca3af"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M9 12h6"
+                stroke="#9ca3af"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M9 16h4"
+                stroke="#9ca3af"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
 
@@ -168,13 +248,28 @@ export default function InvestorRow({
                      transition-all duration-150 active:scale-90 shadow-inner"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="4" width="18" height="7" rx="2"
-                    stroke="#f97373" strokeWidth="1.6" />
-              <path d="M12 11v7"
-                    stroke="#f97373" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M8.5 14.5L12 18l3.5-3.5"
-                    stroke="#f97373" strokeWidth="1.8"
-                    strokeLinecap="round" strokeLinejoin="round"/>
+              <rect
+                x="3"
+                y="4"
+                width="18"
+                height="7"
+                rx="2"
+                stroke="#f97373"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M12 11v7"
+                stroke="#f97373"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8.5 14.5L12 18l3.5-3.5"
+                stroke="#f97373"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         </div>
@@ -214,16 +309,28 @@ export default function InvestorRow({
                        border border-slate-600 transition active:scale-95"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="13" width="16" height="7" rx="2"
-                    fill="#020617"
-                    stroke="#22c55e"
-                    strokeWidth="1.6"
+              <rect
+                x="4"
+                y="13"
+                width="16"
+                height="7"
+                rx="2"
+                fill="#020617"
+                stroke="#22c55e"
+                strokeWidth="1.6"
               />
-              <path d="M12 4v9" stroke="#22c55e" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M8.5 7.5L12 4l3.5 3.5"
-                    stroke="#22c55e" strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+              <path
+                d="M12 4v9"
+                stroke="#22c55e"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8.5 7.5L12 4l3.5 3.5"
+                stroke="#22c55e"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             </svg>
           </button>
@@ -259,7 +366,10 @@ export default function InvestorRow({
         const p = getPayoutForSlot(slot);
         if (!p)
           return (
-            <td key={idx} className="py-2 px-4 border-r border-slate-700/50 min-w-[110px]">
+            <td
+              key={idx}
+              className="py-2 px-4 border-r border-slate-700/50 min-w-[110px]"
+            >
               —
             </td>
           );
@@ -283,7 +393,10 @@ export default function InvestorRow({
         }
 
         return (
-          <td key={idx} className="py-2 px-4 border-r border-slate-700/50 min-w-[110px]">
+          <td
+            key={idx}
+            className="py-2 px-4 border-r border-slate-700/50 min-w-[110px]"
+          >
             <span className={`whitespace-nowrap ${color}`}>
               {sign} {fmt(raw)} ₽
             </span>

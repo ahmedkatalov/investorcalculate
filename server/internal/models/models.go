@@ -10,6 +10,7 @@ type Investor struct {
 	ID             int64     `json:"id"`
 	FullName       string    `json:"full_name"`
 	InvestedAmount float64   `json:"invested_amount"`
+	ProfitShare float64 `json:"profit_share"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 

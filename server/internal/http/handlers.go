@@ -40,13 +40,25 @@ func (s *Server) handleInvestors(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var inv models.Investor
-		_ = json.NewDecoder(r.Body).Decode(&inv)
+		if err := json.NewDecoder(r.Body).Decode(&inv); err != nil {
+			writeJSON(w, 400, errorResponse{Error: "invalid json"})
+			return
+		}
 
+		// defaults
 		if inv.FullName == "" {
 			inv.FullName = ""
 		}
-		if inv.InvestedAmount == 0 {
-			inv.InvestedAmount = 0
+
+		// validation
+		if inv.InvestedAmount < 0 {
+			writeJSON(w, 400, errorResponse{Error: "invested_amount must be >= 0"})
+			return
+		}
+
+		// ✅ profit_share default + validation
+		if inv.ProfitShare <= 0 || inv.ProfitShare > 100 {
+			inv.ProfitShare = 50
 		}
 
 		if err := s.repo.CreateInvestor(ctx, &inv); err != nil {
@@ -77,6 +89,7 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			FullName       *string  `json:"full_name"`
 			InvestedAmount *float64 `json:"invested_amount"`
+			ProfitShare    *float64 `json:"profit_share"` // ✅ новое поле
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -84,7 +97,21 @@ func (s *Server) handleInvestorByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := s.repo.UpdateInvestor(ctx, id, req.FullName, req.InvestedAmount); err != nil {
+		// validation
+		if req.InvestedAmount != nil && *req.InvestedAmount < 0 {
+			writeJSON(w, 400, errorResponse{Error: "invested_amount must be >= 0"})
+			return
+		}
+
+		if req.ProfitShare != nil {
+			if *req.ProfitShare <= 0 || *req.ProfitShare > 100 {
+				writeJSON(w, 400, errorResponse{Error: "profit_share must be between 1 and 100"})
+				return
+			}
+		}
+
+		// ✅ обновляем 3 поля
+		if err := s.repo.UpdateInvestor(ctx, id, req.FullName, req.InvestedAmount, req.ProfitShare); err != nil {
 			writeJSON(w, 500, errorResponse{Error: err.Error()})
 			return
 		}
@@ -133,6 +160,11 @@ func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Amount <= 0 {
+		writeJSON(w, 400, errorResponse{Error: "amount must be > 0"})
+		return
+	}
+
 	period, err := time.Parse("2006-01-02", req.Date)
 	if err != nil {
 		writeJSON(w, 400, errorResponse{Error: "invalid date, must be YYYY-MM-DD"})
@@ -141,8 +173,8 @@ func (s *Server) handleTopup(w http.ResponseWriter, r *http.Request) {
 
 	payout := models.Payout{
 		InvestorID:   req.InvestorID,
-		PeriodMonth:  nil,          // старое поле НЕ ЗАПОЛНЯЕМ
-		PeriodDate:   &period,      // новое поле
+		PeriodMonth:  nil,     // старое поле НЕ ЗАПОЛНЯЕМ
+		PeriodDate:   &period, // новое поле
 		PayoutAmount: req.Amount,
 		IsTopup:      true,
 	}
@@ -188,6 +220,21 @@ func (s *Server) handlePayouts(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 400, errorResponse{Error: "invalid json"})
 			return
 		}
+
+	if req.PayoutAmount == 0 {
+	writeJSON(w, 400, errorResponse{Error: "payoutAmount must not be 0"})
+	return
+}
+
+// ✅ если снимаем капитал — обязано быть отрицательным
+if req.IsWithdrawalCapital && req.PayoutAmount > 0 {
+	req.PayoutAmount = -req.PayoutAmount
+}
+
+// ✅ если НЕ снимаем капитал — обязано быть положительным
+if !req.IsWithdrawalCapital && req.PayoutAmount < 0 {
+	req.PayoutAmount = -req.PayoutAmount
+}
 
 		period, err := time.Parse("2006-01-02", req.Date)
 		if err != nil {

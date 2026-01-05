@@ -293,44 +293,28 @@ export default function MainApp({ logout }) {
     });
 
   async function confirmWithdraw() {
-    const inv = withdrawModal.investor;
-    if (!inv) return;
+  const inv = withdrawModal.investor;
+  if (!inv) return;
 
-    const amount = Number(withdrawModal.amount.replace(/\s/g, ""));
-    if (!amount || amount <= 0) return;
+  const amount = Number(withdrawModal.amount.replace(/\s/g, ""));
+  if (!amount || amount <= 0) return;
 
-    const net = getCurrentNetProfit(inv);
+  try {
+    // ✅ ВСЕГДА снимаем как капитал
+    await createCapitalWithdraw(inv.id, withdrawModal.monthKey, amount);
 
-    const profitPart = Math.min(amount, net);
-    const capitalPart = amount - profitPart;
-
-    try {
-      if (profitPart > 0) {
-        await createTakeProfit(inv.id, withdrawModal.monthKey, profitPart);
-      }
-
-      if (capitalPart > 0) {
-        await createCapitalWithdraw(inv.id, withdrawModal.monthKey, capitalPart);
-      }
-
-      const fresh = await fetchPayouts();
-      setPayouts(
-        Array.isArray(fresh)
-          ? fresh.map((p) => ({ ...p, isTopup: !!p.isTopup || !!p.is_topup }))
-          : []
-      );
-    } catch (e) {
-      console.error("Ошибка при снятии средств:", e);
-    }
-
-    setWithdrawModal({
-      open: false,
-      investor: null,
-      monthKey: "",
-      amount: "",
-      isSaving: false,
-    });
+    const fresh = await fetchPayouts();
+    setPayouts(
+      Array.isArray(fresh)
+        ? fresh.map((p) => ({ ...p, isTopup: !!p.isTopup || !!p.is_topup }))
+        : []
+    );
+  } catch (e) {
+    console.error("Ошибка при снятии средств:", e);
   }
+
+  setWithdrawModal({ open: false, investor: null, monthKey: "", amount: "" });
+}
 
   // ===== RENDER =====
   return (

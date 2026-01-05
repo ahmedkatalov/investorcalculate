@@ -1,12 +1,15 @@
 // useInvestData.js
 
 import { useEffect, useState, useCallback } from "react";
+
+
 import {
   API_URL,
   fetchInvestors,
   fetchPayouts,
   createInvestor,
   createReinvest,
+  updateInvestorAPI,
   createTakeProfit,
   createCapitalWithdraw
 } from "../api/api";
@@ -103,40 +106,18 @@ export function useInvestData() {
   // =============================
   //   ОБНОВЛЕНИЕ ИНВЕСТОРА
   // =============================
-  const updateInvestor = useCallback(async (id, updates) => {
-    const token = localStorage.getItem("token");
-
-    const body = {};
-    if (updates.fullName !== undefined) body.full_name = updates.fullName;
-    if (updates.investedAmount !== undefined)
-      body.invested_amount = updates.investedAmount;
-
-    const res = await fetch(`${API_URL}/investors/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!res.ok) {
-      console.error("❌ UPDATE INVESTOR FAILED:", await res.text());
-      return;
-    }
+const updateInvestor = useCallback(async (id, updates) => {
+  try {
+    const updated = await updateInvestorAPI(id, updates);
 
     setInvestors((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? {
-              ...i,
-              fullName: updates.fullName ?? i.fullName,
-              investedAmount: updates.investedAmount ?? i.investedAmount
-            }
-          : i
-      )
+      prev.map((i) => (i.id === id ? updated : i))
     );
-  }, []);
+  } catch (e) {
+    console.error("❌ UPDATE INVESTOR FAILED:", e);
+  }
+}, []);
+
 
   // =============================
   //   СОЗДАТЬ ИНВЕСТОРА

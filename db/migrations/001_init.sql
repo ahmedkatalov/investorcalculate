@@ -4,9 +4,11 @@ DROP TABLE IF EXISTS investors;
 CREATE TABLE investors (
     id SERIAL PRIMARY KEY,
     full_name TEXT NOT NULL,
+    profit_share NUMERIC(5,2) NOT NULL DEFAULT 50, -- ✅ добавили
     invested_amount NUMERIC(18,2) NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 
 CREATE TABLE payouts (
     id SERIAL PRIMARY KEY,
